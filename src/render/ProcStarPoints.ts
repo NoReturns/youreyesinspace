@@ -54,6 +54,7 @@ export class ProcStarPoints {
       const mat = new ShaderMaterial({
         vertexShader: Shaders.starsVert,
         fragmentShader: Shaders.pointsFrag,
+        defines: { STAR_POINTS: 1, QUADRATIC_STAR_POINTS: 1 },
         uniforms: {
           uCamPc: { value: new Vector3() },
           uPixelRatio: { value: 1 },

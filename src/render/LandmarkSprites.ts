@@ -7,6 +7,7 @@ import { SKY_RADIUS_KM } from '../core/constants';
 import type { Landmark } from '../core/Universe';
 import { LANDMARK_ATLAS_GRID, LANDMARK_ATLAS_SLOT, LANDMARK_IMAGES } from '../data/landmarkImages';
 import { GalaxyCloud } from './GalaxyCloud';
+import { loadNebulaImage } from './NebulaImages';
 import { Shaders } from './shaders';
 
 const _rel = new Vector3();
@@ -34,13 +35,14 @@ export class LandmarkSprites {
   private readonly mat: ShaderMaterial;
   private readonly camPc = new Vector3();
   private readonly pool: LandmarkScreen[] = [];
+  private atlasFadeStart = 0;
 
   constructor(readonly landmarks: Landmark[], scene: Scene) {
     const n = landmarks.length;
     const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
     const rad = new Float32Array(n), kind = new Float32Array(n), mag = new Float32Array(n), seed = new Float32Array(n), idx = new Float32Array(n);
     const img = new Float32Array(n), span = new Float32Array(n);
-    const files: string[] = [];
+    const files: string[] = [], imageIndices: number[] = [];
     landmarks.forEach((l, i) => {
       pos[i * 3] = l.positionPc.x; pos[i * 3 + 1] = l.positionPc.y; pos[i * 3 + 2] = l.positionPc.z;
       col[i * 3] = l.def.color[0]; col[i * 3 + 1] = l.def.color[1]; col[i * 3 + 2] = l.def.color[2];
@@ -51,7 +53,7 @@ export class LandmarkSprites {
       idx[i] = i;
       const photo = LANDMARK_IMAGES[l.def.id];
       if (photo && files.length < LANDMARK_ATLAS_GRID * LANDMARK_ATLAS_GRID) {
-        img[i] = files.length; span[i] = photo.span; files.push(photo.file);
+        img[i] = files.length; span[i] = photo.span; files.push(photo.file); imageIndices.push(i);
       } else {
         img[i] = -1; span[i] = 1.6;
       }
@@ -82,7 +84,7 @@ export class LandmarkSprites {
         uHideIndex: { value: -1 },
         uTime: { value: 0 },
         uAtlas: { value: null },
-        uAtlasReady: { value: 0 },
+        uAtlasMix: { value: 0 },
         uAtlasGrid: { value: LANDMARK_ATLAS_GRID },
         uCloudOn: { value: 0 },
       },
@@ -94,24 +96,29 @@ export class LandmarkSprites {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = -11;
     scene.add(this.mesh);
-    // photographs are a progressive enhancement: procedural sprites until the atlas is in
-    if (files.length && typeof document !== 'undefined') setTimeout(() => this.loadAtlas(files), 1500);
+    // Begin loading alongside the clouds; the photographs fade in after the atlas is complete.
+    if (files.length && typeof document !== 'undefined') this.loadAtlas(files, imageIndices);
   }
 
   /** Compose the landmark photographs into one atlas texture (grid of square slots). */
-  private loadAtlas(files: string[]): void {
+  private loadAtlas(files: string[], imageIndices: number[]): void {
     const G = LANDMARK_ATLAS_GRID, S = LANDMARK_ATLAS_SLOT;
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = G * S;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    let loaded = 0;
-    Promise.all(files.map((file, s) => new Promise<void>((resolve) => {
-      const im = new Image();
-      im.onload = () => { ctx.drawImage(im, (s % G) * S, Math.floor(s / G) * S, S, S); loaded++; resolve(); };
-      im.onerror = () => resolve();
-      im.src = `${import.meta.env.BASE_URL}nebulae/${file}.jpg`;
-    }))).then(() => {
+    Promise.all(files.map(loadNebulaImage)).then((images) => {
+      let loaded = 0;
+      images.forEach((im, s) => {
+        if (!im) {
+          const attribute = this.mesh.geometry.getAttribute('iImg') as InstancedBufferAttribute;
+          attribute.setX(imageIndices[s], -1);
+          attribute.needsUpdate = true;
+          return;
+        }
+        ctx.drawImage(im, (s % G) * S, Math.floor(s / G) * S, S, S);
+        loaded++;
+      });
       if (!loaded) return;
       const tex = new CanvasTexture(canvas);
       tex.colorSpace = NoColorSpace; // raw sRGB bytes; decoded explicitly in the shader
@@ -119,7 +126,8 @@ export class LandmarkSprites {
       tex.generateMipmaps = true;
       tex.anisotropy = 4;
       this.mat.uniforms.uAtlas.value = tex;
-      this.mat.uniforms.uAtlasReady.value = 1;
+      // The texture is uploaded on the next draw. Start fading only after that upload.
+      tex.onUpdate = () => { this.atlasFadeStart = performance.now(); };
     });
   }
 
@@ -128,11 +136,12 @@ export class LandmarkSprites {
    * clearly resolved (≥ minPx) and in front of the camera. Null when none / atlas not loaded.
    */
   photoCredit(forward: Vector3, minPx = 60): string | null {
-    if (!this.mat.uniforms.uAtlasReady.value) return null;
+    if (this.mat.uniforms.uAtlasMix.value < 0.5) return null;
     let best: string | null = null;
     let bestPx = minPx;
     for (const m of this.named) {
       if (m.radiusPx < bestPx || m.dir.dot(forward) < 0.7) continue;
+      if ((this.mesh.geometry.getAttribute('iImg') as InstancedBufferAttribute).getX(m.index) < 0) continue;
       const photo = LANDMARK_IMAGES[this.landmarks[m.index].def.id];
       if (!photo) continue;
       bestPx = m.radiusPx;
@@ -187,6 +196,10 @@ export class LandmarkSprites {
     }
     u.uHideIndex.value = hide;
     u.uTime.value = (performance.now() * 1e-3) % 1000;
+    if (this.atlasFadeStart > 0) {
+      const t = Math.min(1, (performance.now() - this.atlasFadeStart) / 1000);
+      u.uAtlasMix.value = t * t * (3 - 2 * t);
+    }
   }
 
   /** Landmark nearest to a screen point (px) among the currently labelled ones */

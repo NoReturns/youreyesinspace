@@ -7,6 +7,7 @@ import { LANDMARK_IMAGES, type LandmarkImage } from '../data/landmarkImages';
 import { Rng } from '../gen/SystemGenerator';
 import { raDecToScene } from '../math/frames';
 import { Shaders } from './shaders';
+import { loadNebulaImage } from './NebulaImages';
 
 /** sample grid over the photograph */
 const GRID = 160;
@@ -46,10 +47,10 @@ export class NebulaClouds {
       const photo = LANDMARK_IMAGES[l.def.id];
       if (!photo) return;
       this.pending++;
-      const im = new Image();
-      im.onload = () => { this.build(i, l, photo, im); this.done(); };
-      im.onerror = () => this.done();
-      im.src = `${import.meta.env.BASE_URL}nebulae/${photo.file}.jpg`;
+      loadNebulaImage(photo.file).then((im) => {
+        if (im) this.build(i, l, photo, im);
+        this.done();
+      });
     });
   }
 
@@ -72,10 +73,9 @@ export class NebulaClouds {
     let sum = 0, lmax = 1e-6;
     for (let i = 0; i < GRID * GRID; i++) {
       const r = srgb(data[i * 4]), g = srgb(data[i * 4 + 1]), b = srgb(data[i * 4 + 2]);
-      // same superellipse vignette as the sprite: the picture's frame must not become a wall
+      // Same circular feather as the sprite: no photograph frame becomes a wall.
       const px = ((i % GRID) + 0.5) / GRID * 2 - 1, py = (Math.floor(i / GRID) + 0.5) / GRID * 2 - 1;
-      const q = Math.pow(px * px * px * px + py * py * py * py, 0.25);
-      const mask = 1 - smoothstep(0.68, 1.0, q);
+      const mask = 1 - smoothstep(0.55, 1.0, Math.hypot(px, py));
       const L = (0.2126 * r + 0.7152 * g + 0.0722 * b) * mask;
       lum[i] = L;
       raw[i] = L / Math.max(mask, 1e-3);

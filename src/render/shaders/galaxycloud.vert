@@ -16,6 +16,7 @@ uniform float uMaxPx;
 uniform float uExtinction;  // 1/pc – dust extinction along the line of sight when inside the disc
 varying vec3 vColor;
 varying float vAlpha;
+varying float vStarSize;
 
 void main() {
   vec3 rel = uBasis * position + uCenterRel;
@@ -40,7 +41,9 @@ void main() {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     px = 0.0;
   }
-  gl_PointSize = px * uPixelRatio;
+  vStarSize = px * uPixelRatio;
+  // At reduced render scale, subpixel blobs use the steadier quadratic footprint.
+  gl_PointSize = vStarSize < 1.0 ? 3.0 : max(vStarSize, 2.0);
   vColor = col;
   vAlpha = min(a, 1.0);
   #include <logdepthbuf_vertex>

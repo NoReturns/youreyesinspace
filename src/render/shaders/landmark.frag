@@ -9,7 +9,7 @@ varying float vImg;
 varying float vSpan;
 uniform float uTime;
 uniform sampler2D uAtlas;
-uniform float uAtlasReady;
+uniform float uAtlasMix;
 uniform float uAtlasGrid;
 
 void main() {
@@ -18,7 +18,8 @@ void main() {
   float r = length(p) * vSpan;   // 1 at the object's radius
   float a;
   vec3 col = vColor;
-  if (vImg >= 0.0 && uAtlasReady > 0.5) {
+  vec3 photoColor = vec3(0.0);
+  if (vImg >= 0.0 && uAtlasMix > 0.0) {
     // photograph from the atlas (flipY canvas texture: slot rows count from the top)
     float g = uAtlasGrid;
     float slotCol = mod(vImg, g);
@@ -29,12 +30,10 @@ void main() {
     // the output pass applies ACES filmic, which pre-scales by 1/0.6 and lifts the mid-tones;
     // compensate so the photograph keeps its published contrast and colour
     tex *= 0.55;
-    // soft superellipse vignette hides the frame without reading as a disc; the photo's own
-    // sky is additive-black anyway
-    vec2 q = p * p; q *= q;
-    float mask = smoothstep(1.0, 0.68, pow(q.x + q.y, 0.25));
-    gl_FragColor = vec4(tex * mask * vAlpha, 1.0);
-    return;
+    // A circular feather reaches zero before all four straight quad edges.
+    // Keep the procedural sprite visible while the local photograph fades in.
+    float mask = 1.0 - smoothstep(0.55, 1.0, length(p));
+    photoColor = tex * mask * vAlpha;
   }
   if (vKind < 0.5) {
     // nebula: irregular glowing cloud with brighter knots
@@ -71,5 +70,5 @@ void main() {
     a = (exp(-rr * rr * 7.0) + 0.15 * exp(-rr * 2.5)) * (0.55 + 0.9 * flash) + cross * 0.22 * flash;
   }
   a *= vAlpha;
-  gl_FragColor = vec4(col * a, 1.0);
+  gl_FragColor = vec4(mix(col * a, photoColor, vImg >= 0.0 ? uAtlasMix : 0.0), 1.0);
 }

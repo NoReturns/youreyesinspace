@@ -47,6 +47,7 @@ export class GalaxyCloud {
     this.mat = new ShaderMaterial({
       vertexShader: Shaders.galaxyCloudVert,
       fragmentShader: Shaders.pointsFrag,
+      defines: { STAR_POINTS: 1, ADAPTIVE_CLOUD_POINTS: 1 },
       uniforms: {
         uBasis: { value: model.basis },
         uCenterRel: { value: new Vector3() },

@@ -11,6 +11,7 @@ uniform float uHideIndex;  // index of the current system's star (rendered as a 
 uniform float uMagLimit;   // faintest apparent magnitude drawn
 varying vec3 vColor;
 varying float vAlpha;
+varying float vStarSize;
 
 void main() {
   vec3 rel = position - uCamPc;
@@ -28,7 +29,9 @@ void main() {
     alpha = 0.0;
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // clip
   }
-  gl_PointSize = size * uPixelRatio;
+  vStarSize = size * uPixelRatio;
+  // The quadratic reconstruction needs three physical pixels of raster coverage.
+  gl_PointSize = max(vStarSize, 3.0);
   vColor = color;
   vAlpha = alpha;
   #include <logdepthbuf_vertex>
