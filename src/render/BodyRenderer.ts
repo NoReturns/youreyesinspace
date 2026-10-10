@@ -10,6 +10,7 @@ import type { StarSystem } from '../core/StarSystem';
 import { DEG, PARSEC_KM } from '../core/constants';
 import { temperatureToRgb } from '../astro/stellar';
 import { IMAGERY } from '../data/imagery';
+import { reachImagery, type ReachVisualAssets } from '../reach/ReachVisualAssets';
 import { Shaders } from './shaders';
 import { TileGlobe } from './TileGlobe';
 import { buildProceduralShip, disposeGroup } from './ProceduralShips';
@@ -133,7 +134,8 @@ export class BodyView {
 
   private lit: Uniforms[] = [];
 
-  constructor(body: CelestialBody, sphereGeo: SphereGeometry, starRadius: number, maxAnisotropy = 1) {
+  constructor(body: CelestialBody, sphereGeo: SphereGeometry, starRadius: number, maxAnisotropy = 1,
+    reachVisuals?: ReachVisualAssets) {
     this.body = body;
     const d = body.data;
     const a = d.appearance;
@@ -210,7 +212,7 @@ export class BodyView {
           uUseCylindricalMap: { value: 0 },
         },
       });
-      if (a.cylindricalMap) {
+      if (a.cylindricalMap && reachVisuals?.mode !== 'procedural') {
         const url = `${import.meta.env.BASE_URL}${a.cylindricalMap}?v=${__BUILD_ID__}`;
         const texture = textureLoader.load(url, () => {
           this.surfaceMat!.uniforms.uUseCylindricalMap.value = 1;
@@ -246,7 +248,7 @@ export class BodyView {
           uSunsetColor: { value: d.atmosphere?.sunsetColor ? vec3(d.atmosphere.sunsetColor) : new Vector3(1, 0.6, 0.35) },
         },
       });
-      const img = IMAGERY[d.id];
+      const img = reachVisuals ? reachImagery(d.id, reachVisuals) : IMAGERY[d.id];
       if (img) {
         this.tiles = new TileGlobe(body, img, lit, {
           atmColor: this.surfaceMat.uniforms.uAtmColor.value as Vector3,
@@ -639,7 +641,8 @@ export class BodyRenderer {
   /** credit line for the imagery currently dominating the view (null = none) */
   imageryCredit: string | null = null;
 
-  constructor(private readonly scene: Scene, private readonly maxAnisotropy = 1) {
+  constructor(private readonly scene: Scene, private readonly maxAnisotropy = 1,
+    private readonly reachVisuals?: ReachVisualAssets) {
     this.sunLight.target.position.set(0, 0, 0);
     scene.add(this.sunLight, this.sunLight.target, this.fillLight);
   }
@@ -651,7 +654,7 @@ export class BodyRenderer {
     this.byId.clear();
     const star = system.star;
     for (const b of system.bodies) {
-      const v = new BodyView(b, this.sphereGeo, star.radius, this.maxAnisotropy);
+      const v = new BodyView(b, this.sphereGeo, star.radius, this.maxAnisotropy, this.reachVisuals);
       v.addTo(this.scene);
       this.views.push(v);
       this.byId.set(b.id, v);
@@ -662,7 +665,7 @@ export class BodyRenderer {
   /** Add a view for a body created at runtime (mission vehicles). */
   addBody(b: CelestialBody, system: StarSystem): BodyView {
     this.removeBody(b.id);
-    const v = new BodyView(b, this.sphereGeo, system.star.radius, this.maxAnisotropy);
+    const v = new BodyView(b, this.sphereGeo, system.star.radius, this.maxAnisotropy, this.reachVisuals);
     v.addTo(this.scene);
     v.computeOccluders();
     this.views.push(v);

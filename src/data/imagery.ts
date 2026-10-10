@@ -16,6 +16,10 @@ export interface TileProvider {
   span0: number;
   /** Deepest level to request */
   maxLevel: number;
+  /** A single local equirectangular map, rather than a square geographic tile. */
+  fullMap?: boolean;
+  /** Local fallback if an already verified enhanced map disappears before loading. */
+  fallbackUrl?: string;
 }
 
 export interface BodyImagery {

@@ -34,6 +34,7 @@ import { fmtDuration, fmtLightYears } from './ui/format';
 import { _, applyDom, initI18n } from './i18n';
 import { Missions, type ActiveMission } from './core/Missions';
 import { TrajectoryLines } from './render/TrajectoryLines';
+import { readReachVisualAssets } from './reach/ReachVisualAssets';
 import { TourPlayer, type SurfacePin, type TourOverrides } from './core/TourPlayer';
 import type { MissionPlan } from './astro/mission';
 
@@ -138,7 +139,8 @@ class App implements UIHost {
     this.grid = new SkyGrid(scene);
     this.belts = new Belts(scene);
     this.orbits = new OrbitLines(scene);
-    this.bodies = new BodyRenderer(scene, this.engine.renderer.capabilities.getMaxAnisotropy());
+    this.bodies = new BodyRenderer(scene, this.engine.renderer.capabilities.getMaxAnisotropy(),
+      REACH_MODE ? readReachVisualAssets() : undefined);
     this.points = new BodyPoints(scene);
     this.overlay = new Overlay(overlayCanvas);
     this.input = new Input(sceneCanvas, !REACH_MODE);

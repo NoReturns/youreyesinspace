@@ -33,6 +33,7 @@ interface LoadJob {
   node: TileNode;
   slot: 'day' | 'night';
   url: string;
+  fallbackUrl?: string;
   requestedAt: number;
 }
 
@@ -71,8 +72,8 @@ class TileLoader {
     const slot = job.node[job.slot];
     slot.status = 'loading';
     this.inFlight++;
-    this.loader.load(
-      job.url,
+    const load = (url: string, fallbackUrl?: string): void => { this.loader.load(
+      url,
       (tex) => {
         this.inFlight--;
         if (job.node.disposed) { tex.dispose(); return; }
@@ -85,10 +86,12 @@ class TileLoader {
       },
       undefined,
       () => {
+        if (fallbackUrl) { load(fallbackUrl); return; }
         this.inFlight--;
         slot.status = 'error';
       },
-    );
+    ); };
+    load(job.url, job.fallbackUrl);
   }
 
   release(slot: TexSlot): void {
@@ -370,7 +373,8 @@ export class TileGlobe {
     if (s.status !== 'idle') return;
     const provider: TileProvider = slot === 'day' ? this.imagery.day : this.imagery.night!;
     s.status = 'queued';
-    tileLoader.enqueue({ node: n, slot, url: provider.url(n.z, n.x, n.y), requestedAt: performance.now() });
+    tileLoader.enqueue({ node: n, slot, url: provider.url(n.z, n.x, n.y),
+      fallbackUrl: provider.fallbackUrl, requestedAt: performance.now() });
   }
 
   /** Release subtrees that have not been needed for a while (roots are never released). */
@@ -392,7 +396,7 @@ export class TileGlobe {
   /** Grid patch on the ellipsoid, positions relative to the patch centre (body frame). */
   private buildMesh(n: TileNode): Mesh {
     const extent = Math.max(n.cLon1 - n.cLon0, n.cLat1 - n.cLat0);
-    const seg = Math.min(48, Math.max(12, Math.ceil(extent / 3)));
+    const seg = this.imagery.day.fullMap ? 96 : Math.min(48, Math.max(12, Math.ceil(extent / 3)));
     const verts = (seg + 1) * (seg + 1);
     const pos = new Float32Array(verts * 3);
     const nor = new Float32Array(verts * 3);
@@ -408,8 +412,8 @@ export class TileGlobe {
         pos[k * 3] = _p.x; pos[k * 3 + 1] = _p.y; pos[k * 3 + 2] = _p.z;
         const cl = Math.cos(lat * DEG);
         nor[k * 3] = cl * Math.cos(lon * DEG); nor[k * 3 + 1] = Math.sin(lat * DEG); nor[k * 3 + 2] = -cl * Math.sin(lon * DEG);
-        uv[k * 2] = (lon - n.lon0) / n.span;
-        uv[k * 2 + 1] = (lat - (n.latTop - n.span)) / n.span;
+        uv[k * 2] = this.imagery.day.fullMap ? (lon + 180) / 360 : (lon - n.lon0) / n.span;
+        uv[k * 2 + 1] = this.imagery.day.fullMap ? (lat + 90) / 180 : (lat - (n.latTop - n.span)) / n.span;
       }
     }
     const idx = new Uint16Array(seg * seg * 6);
