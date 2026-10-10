@@ -4,3 +4,7 @@ dist
 *.local
 .env
 .env.*
+
+/validation/star-stability/**/*.png
+
+/validation/star-stability/**/*.png
