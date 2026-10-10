@@ -7,6 +7,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CAMERA_FAR_KM, CAMERA_NEAR_KM } from './constants';
 import { BlackHolePass } from '../render/BlackHolePass';
+import { applyPanoramaView, localPanoramaFovRad, type ReachPanoramaContract } from '../reach/ReachPanorama';
 
 /** Renderer + camera + post-processing. Camera stays at the origin (floating origin). */
 export class Engine {
@@ -23,6 +24,7 @@ export class Engine {
   useComposer = true;
   /** user render-resolution scale (1 = device pixels, capped) */
   renderScale = 1;
+  private panorama: ReachPanoramaContract | null = null;
   /** coarse-pointer devices (phones/tablets): cheaper defaults */
   readonly mobile = window.matchMedia('(pointer: coarse)').matches;
 
@@ -67,7 +69,20 @@ export class Engine {
     this.composer.setPixelRatio(this.pixelRatio);
     this.composer.setSize(this.width, this.height);
     this.camera.aspect = this.width / this.height;
-    this.camera.updateProjectionMatrix();
+    if (this.panorama) {
+      const view = this.panorama;
+      applyPanoramaView(this.camera, view);
+    } else this.camera.updateProjectionMatrix();
+  }
+
+  setPanorama(contract: ReachPanoramaContract): void {
+    this.panorama = contract;
+    this.resize();
+  }
+
+  get localVerticalFovRad(): number {
+    const full = this.camera.fov * Math.PI / 180;
+    return this.panorama ? localPanoramaFovRad(this.camera.fov, this.panorama) : full;
   }
 
   setRenderScale(scale: number): void {

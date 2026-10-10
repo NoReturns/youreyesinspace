@@ -11,6 +11,8 @@ const entry = `
   export { TimeSystem } from './src/core/TimeSystem.ts';
   export { SOLAR_SYSTEM } from './src/data/solarSystem.ts';
   export { ReachTiming, REACH_TIMING, reachTravelKind } from './src/reach/ReachTiming.ts';
+  export { COUNTDOWN_POSITIONS, ReachCountdownOverlay, formatCountdown, readCountdownContract, resolveCountdownPosition } from './src/reach/ReachCountdownOverlay.ts';
+  export { ReachPanoramaSync, applyPanoramaView, localPanoramaFovRad, parseReachPanorama, readReachPanorama } from './src/reach/ReachPanorama.ts';
   export { loadReachJourney, parseReachJourney, saveReachJourney } from './src/reach/JourneyState.ts';
 `;
 const bundle = await rolldown({
@@ -30,6 +32,8 @@ new Function('require', 'module', 'exports', output.output[0].code)(
 const {
   ReachVoyageDirector, REACH_ITINERARY, CameraController, StarSystem, TimeSystem, SOLAR_SYSTEM,
   ReachTiming, REACH_TIMING, reachTravelKind, loadReachJourney, parseReachJourney, saveReachJourney,
+  COUNTDOWN_POSITIONS, ReachCountdownOverlay, formatCountdown, readCountdownContract, resolveCountdownPosition,
+  ReachPanoramaSync, applyPanoramaView, localPanoramaFovRad, parseReachPanorama, readReachPanorama,
 } = module.exports;
 
 const route = REACH_ITINERARY;
@@ -118,6 +122,16 @@ for (const [label, match] of cases) {
   assert.ok(parsed, `${label}: saved state validates`);
   assert.deepEqual(parsed.phase, captured.phase, `${label}: phase data survives JSON`);
   const resumed = makeRun(parsed);
+  const countdown = run.director.countdown;
+  const phase = captured.phase;
+  assert.equal(countdown.phase, phase.kind === 'cruise' ? 'NEXT' : phase.kind === 'departure' ? 'CRUISE' : 'DEPART');
+  assert.equal(countdown.destinationId, phase.kind === 'departure' ? phase.nextId : captured.destinationId);
+  assert.ok(Math.abs(countdown.secondsLeft - (phase.duration - phase.elapsed)) < 1e-8);
+  assert.equal(resumed.director.countdown.phase, countdown.phase);
+  assert.equal(resumed.director.countdown.destinationId, countdown.destinationId);
+  assert.equal(resumed.director.countdown.routeIndex, countdown.routeIndex);
+  assert.ok(Math.abs(resumed.director.countdown.secondsLeft - countdown.secondsLeft) < 1e-8,
+    `${label}: restored countdown`);
   compare(run, resumed, label);
   console.log(`PASS ${label} save, restore, remaining duration, and continuity through the next phase`);
 }
@@ -170,9 +184,15 @@ console.log('PASS production bounds, test durations, and non-finite random input
 const circuit = makeRun();
 const visited = new Set(['earth']);
 const travelled = new Set();
+let venusWrap = false;
 for (let i = 0; i < 25_000 && (visited.size < 41 || travelled.size < 41); i++) {
   step(circuit);
   const state = circuit.director.capture();
+  if (state.destinationId === 'venus' && state.phase.kind === 'departure') {
+    assert.equal(circuit.director.countdown.destinationId, 'earth');
+    assert.equal(circuit.director.countdown.routeIndex, 0);
+    venusWrap = true;
+  }
   if (state.phase.kind === 'cruise') {
     assert.equal(state.phase.duration, 30);
     travelled.add(state.destinationId);
@@ -184,7 +204,152 @@ for (let i = 0; i < 25_000 && (visited.size < 41 || travelled.size < 41); i++) {
 }
 assert.equal(visited.size, 41);
 assert.equal(travelled.size, 41);
+assert.ok(venusWrap, 'Venus departure labels the next Earth destination');
 console.log('PASS all 41 test-mode arrivals and travel legs');
+
+assert.equal(COUNTDOWN_POSITIONS.length, 6);
+for (let index = 0; index < route.length; index++) {
+  assert.equal(resolveCountdownPosition('auto', index), COUNTDOWN_POSITIONS[index % 6]);
+  for (const fixed of COUNTDOWN_POSITIONS) assert.equal(resolveCountdownPosition(fixed, index), fixed);
+}
+assert.equal(resolveCountdownPosition('auto', 0), COUNTDOWN_POSITIONS[0], 'wrapped Earth returns to first anchor');
+assert.equal(formatCountdown(221.1), '03:42');
+assert.equal(formatCountdown(3600), '01:00:00');
+for (const bad of [-10, Number.NaN, Infinity]) assert.equal(formatCountdown(bad), '00:00');
+const pausedRun = makeRun();
+const pausedCountdown = pausedRun.director.countdown;
+pausedRun.director.update(5, true);
+assert.deepEqual(pausedRun.director.countdown, pausedCountdown, 'pause retains the phase countdown');
+const previousWindow = globalThis.window;
+globalThis.window = { __reachCountdown: { enabled: true, primaryDisplay: true, position: 'auto' } };
+assert.ok(readCountdownContract());
+globalThis.window.__reachCountdown.primaryDisplay = false;
+assert.equal(readCountdownContract(), null);
+globalThis.window.__reachCountdown.primaryDisplay = true;
+globalThis.window.__reachCountdown.enabled = false;
+assert.equal(readCountdownContract(), null);
+globalThis.window = previousWindow;
+
+let writes = 0;
+const element = { dataset: {}, setAttribute() {}, get textContent() { return this._text ?? ''; },
+  set textContent(value) { writes++; this._text = value; } };
+const previousDocument = globalThis.document;
+globalThis.document = { createElement: () => element, body: { appendChild() {} } };
+const overlay = new ReachCountdownOverlay(circuit.director, 'auto');
+overlay.update(0);
+const firstPosition = element.dataset.position;
+overlay.update(500);
+assert.equal(writes, 1, 'no DOM writes between one-second updates');
+assert.equal(element.dataset.position, firstPosition);
+overlay.update(1000);
+assert.equal(writes, 1, 'no DOM write when visible text is unchanged');
+globalThis.document = previousDocument;
+console.log('PASS six anchors, auto rotation, display gating, formatting, and DOM update throttle');
+
+const sessionId = 'a'.repeat(32);
+const previousPanoramaWindow = globalThis.window;
+globalThis.window = { location: { search: '?reach=1&panorama=1' } };
+assert.throws(() => readReachPanorama(), /not injected/, 'multi-monitor launch must not become independent full-screen voyages');
+globalThis.window.location.search = '?reach=1';
+assert.equal(readReachPanorama(), null, 'single-monitor mode does not require a panorama contract');
+globalThis.window = previousPanoramaWindow;
+function panoramaView(monitor, desktop, isPrimaryDisplay) {
+  return parseReachPanorama({
+    schema: 1, sessionId, isPrimaryDisplay,
+    monitorBounds: monitor, virtualDesktopBounds: desktop,
+    viewportOffsetX: monitor.x - desktop.x, viewportOffsetY: monitor.y - desktop.y,
+    viewportWidth: monitor.width, viewportHeight: monitor.height,
+    totalPanoramaWidth: desktop.width, totalPanoramaHeight: desktop.height, devicePixelRatio: 1.5,
+  });
+}
+function projectAt(view, desktopX, desktopY, fov = 50) {
+  const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 100);
+  applyPanoramaView(camera, view);
+  const tangent = Math.tan(fov * Math.PI / 360);
+  const x = (2 * desktopX / view.totalPanoramaWidth - 1) * tangent * view.totalPanoramaWidth / view.totalPanoramaHeight;
+  const y = (1 - 2 * desktopY / view.totalPanoramaHeight) * tangent;
+  const projected = new Vector3(x, y, -1).project(camera);
+  return [(projected.x + 1) * view.viewportWidth / 2,
+    (1 - projected.y) * view.viewportHeight / 2];
+}
+const desktop = { x: -3840, y: -720, width: 8320, height: 2160 };
+const twoDesktop = { x: -2560, y: 0, width: 4480, height: 1440 };
+const twoLeft = panoramaView({ x: -2560, y: 0, width: 2560, height: 1440 }, twoDesktop, false);
+const twoRight = panoramaView({ x: 0, y: 0, width: 1920, height: 1080 }, twoDesktop, true);
+assert.ok(Math.abs(projectAt(twoLeft, 2560, 500)[0] - 2560) < 1e-6);
+assert.ok(Math.abs(projectAt(twoRight, 2560, 500)[0]) < 1e-6);
+const left = panoramaView({ x: -3840, y: -720, width: 2560, height: 1440 }, desktop, false);
+const primary = panoramaView({ x: 0, y: 0, width: 2560, height: 1440 }, desktop, true);
+const right = panoramaView({ x: 2560, y: 360, width: 1920, height: 1080 }, desktop, false);
+for (const view of [left, primary, right]) {
+  const x = view.viewportOffsetX + view.viewportWidth / 2;
+  const y = view.viewportOffsetY + view.viewportHeight / 2;
+  const projected = projectAt(view, x, y);
+  assert.ok(Math.abs(projected[0] - view.viewportWidth / 2) < 1e-6);
+  assert.ok(Math.abs(projected[1] - view.viewportHeight / 2) < 1e-6);
+}
+const resizedCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+applyPanoramaView(resizedCamera, right);
+const projectionBeforeResize = resizedCamera.projectionMatrix.clone();
+resizedCamera.aspect = right.viewportWidth / right.viewportHeight;
+applyPanoramaView(resizedCamera, right);
+assert.deepEqual(resizedCamera.projectionMatrix.elements, projectionBeforeResize.elements,
+  'resize must preserve the panorama projection');
+resizedCamera.fov = 65;
+resizedCamera.updateProjectionMatrix();
+assert.equal(resizedCamera.view.offsetX, right.viewportOffsetX, 'FOV changes must preserve the view offset');
+const seamPrimary = projectAt(primary, right.viewportOffsetX, right.viewportOffsetY + 440);
+const seamRight = projectAt(right, right.viewportOffsetX, right.viewportOffsetY + 440);
+assert.ok(Math.abs(seamPrimary[0] - primary.viewportWidth) < 1e-6);
+assert.ok(Math.abs(seamRight[0]) < 1e-6);
+assert.ok(Math.abs(seamPrimary[1] - 800) < 1e-6);
+assert.ok(Math.abs(seamRight[1] - 440) < 1e-6);
+const stackedDesktop = { x: -100, y: -1080, width: 2560, height: 2520 };
+const above = panoramaView({ x: -100, y: -1080, width: 1920, height: 1080 }, stackedDesktop, false);
+const below = panoramaView({ x: -100, y: 0, width: 2560, height: 1440 }, stackedDesktop, true);
+assert.ok(Math.abs(projectAt(above, 900, 1080)[1] - 1080) < 1e-6);
+assert.ok(Math.abs(projectAt(below, 900, 1080)[1]) < 1e-6);
+const fourDesktop = { x: -1920, y: -1080, width: 5760, height: 2520 };
+const fourMonitors = [
+  { x: -1920, y: 200, width: 1920, height: 1080 },
+  { x: 0, y: 0, width: 2560, height: 1440 },
+  { x: 0, y: -1080, width: 1920, height: 1080 },
+  { x: 2560, y: 300, width: 1280, height: 1024 },
+].map((monitor, index) => panoramaView(monitor, fourDesktop, index === 1));
+for (const view of fourMonitors) {
+  const x = view.viewportOffsetX + view.viewportWidth / 2;
+  const y = view.viewportOffsetY + view.viewportHeight / 2;
+  assert.deepEqual(projectAt(view, x, y).map(Math.round),
+    [view.viewportWidth / 2, view.viewportHeight / 2].map(Math.round));
+}
+assert.ok(localPanoramaFovRad(50, right) < localPanoramaFovRad(50, primary));
+assert.throws(() => panoramaView({ x: -4000, y: 0, width: 200, height: 100 }, desktop, false));
+
+const previousBroadcastChannel = globalThis.BroadcastChannel;
+const previousSyncWindow = globalThis.window;
+class TestChannel {
+  static channels = [];
+  constructor(name) { this.name = name; TestChannel.channels.push(this); }
+  postMessage(data) { for (const channel of TestChannel.channels) if (channel !== this && channel.name === this.name)
+    channel.onmessage?.({ data }); }
+  close() {}
+}
+globalThis.BroadcastChannel = TestChannel;
+globalThis.window = { addEventListener() {} };
+const leader = new ReachPanoramaSync(primary);
+const follower = new ReachPanoramaSync(right);
+assert.equal(follower.latest, null);
+const sharedFrame = { jd: 2460000, rate: 1, paused: false, position: [1, 2, 3],
+  orientation: [0, 0, 0, 1], referenceId: 'earth', targetId: 'earth',
+  destinationId: 'earth', phase: 'DEPART', secondsLeft: 8 };
+leader.publish(sharedFrame);
+assert.equal(follower.latest?.sequence, 0);
+assert.deepEqual(follower.latest?.position, [1, 2, 3]);
+follower.publish({ ...sharedFrame, destinationId: 'mars' });
+assert.equal(follower.latest?.destinationId, 'earth', 'follower cannot publish another journey');
+globalThis.BroadcastChannel = previousBroadcastChannel;
+globalThis.window = previousSyncWindow;
+console.log('PASS 1-4 display panorama fixtures, negative and stacked coordinates, and primary-only frame publication');
 
 let productionDraws = 0;
 const production = makeRun(null, { mode: 'production', random: () => { productionDraws++; return 0.37; } });

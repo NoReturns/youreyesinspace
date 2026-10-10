@@ -24,6 +24,8 @@ import type { NamedStarScreen } from './render/StarPoints';
 import { Input } from './input/Input';
 import { CameraController } from './camera/CameraController';
 import { ReachVoyageDirector, REACH_ITINERARY } from './reach/ReachVoyageDirector';
+import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
+import { ReachPanoramaSync, readReachPanorama } from './reach/ReachPanorama';
 import { LocalStorageReachJourneyStore, loadReachJourney, saveReachJourney, type ReachJourneyStore } from './reach/JourneyState';
 import { ReachTiming } from './reach/ReachTiming';
 import { UI, type UIHost } from './ui/UI';
@@ -66,7 +68,12 @@ class App implements UIHost {
   readonly input: Input;
   readonly camera: CameraController;
   readonly reach: ReachVoyageDirector | null;
-  private readonly reachStore: ReachJourneyStore | null = REACH_MODE ? new LocalStorageReachJourneyStore() : null;
+  private readonly reachCountdown: ReachCountdownOverlay | null;
+  private readonly panorama = REACH_MODE ? readReachPanorama() : null;
+  private readonly panoramaSync = this.panorama ? new ReachPanoramaSync(this.panorama) : null;
+  private lastPanoramaSequence = -1;
+  private readonly reachStore: ReachJourneyStore | null = REACH_MODE && this.panorama?.isPrimaryDisplay !== false
+    ? new LocalStorageReachJourneyStore() : null;
   private lastReachSave = performance.now();
   readonly ui: UI;
   selected: CelestialBody | null = null;
@@ -108,6 +115,7 @@ class App implements UIHost {
     const sceneCanvas = document.getElementById('scene') as HTMLCanvasElement;
     const overlayCanvas = document.getElementById('overlay') as HTMLCanvasElement;
     this.engine = new Engine(sceneCanvas);
+    if (this.panorama) this.engine.setPanorama(this.panorama);
     const scene = this.engine.scene;
     const gl = this.engine.renderer.getContext();
     const range = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE) as Float32Array | number[];
@@ -170,15 +178,23 @@ class App implements UIHost {
 
     // Opening view: the planetary system as a slowly circling backdrop until the visitor picks a
     // destination (and again after a tour has finished)
-    if (REACH_MODE) {
+    if (REACH_MODE && this.panorama?.isPrimaryDisplay === false) {
+      this.reach = null;
+      this.reachCountdown = null;
+      this.uiVisible = false;
+    } else if (REACH_MODE) {
       this.reach = new ReachVoyageDirector(this.universe, this.camera, this.time,
         new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach());
+      const countdown = readCountdownContract();
+      this.reachCountdown = countdown ? new ReachCountdownOverlay(this.reach, countdown.position) : null;
+      this.reachCountdown?.update(performance.now());
       this.uiVisible = false;
       window.addEventListener('pagehide', () => this.checkpointReach());
       document.addEventListener('visibilitychange', () => { if (document.hidden) this.checkpointReach(); });
       this.checkpointReach();
     } else {
       this.reach = null;
+      this.reachCountdown = null;
       this.showBackdrop(false);
     }
 
@@ -199,6 +215,19 @@ class App implements UIHost {
     this.updateGalaxyScale(true);
 
     this.applySettings();
+    if (this.panorama) Object.defineProperty(window, '__reachPanoramaStatus', {
+      value: () => ({
+        primary: this.panorama!.isPrimaryDisplay,
+        sequence: this.panorama!.isPrimaryDisplay ? this.panoramaSync!.sentSequence : this.lastPanoramaSequence,
+        countdown: document.getElementById('reach-countdown') !== null,
+        viewport: [this.engine.width, this.engine.height],
+        viewOffset: this.engine.camera.view,
+        projection: this.engine.camera.projectionMatrix.elements,
+        canvas: [this.engine.renderer.domElement.width, this.engine.renderer.domElement.height],
+        contract: this.panorama,
+      }),
+      configurable: false,
+    });
     requestAnimationFrame(this.frame);
     document.getElementById('loader')?.classList.add('done');
   }
@@ -1089,23 +1118,54 @@ class App implements UIHost {
     requestAnimationFrame(this.frame);
     const dt = Math.min(0.1, Math.max(0.0001, (now - this.last) / 1000));
     this.last = now;
+    const follower = this.panorama?.isPrimaryDisplay === false;
+    const shared = follower ? this.panoramaSync?.latest : null;
+    if (follower && (!shared || shared.sequence === this.lastPanoramaSequence)) return;
+    if (shared) {
+      this.lastPanoramaSequence = shared.sequence;
+      this.time.jd = shared.jd;
+      this.time.rate = shared.rate;
+      this.time.paused = shared.paused;
+    }
 
     // Simulation
-    this.time.advance(dt);
+    if (!follower) this.time.advance(dt);
     this.missions.update(this.time.jd, this.time.t);
     this.universe.update(this.time.jd, this.time.t);
     this.tours.update(dt);
 
     // Camera
     const eng = this.engine;
-    const fovRad = eng.camera.fov * DEG;
-    if (this.reach?.directing) {
+    const fovRad = eng.localVerticalFovRad;
+    if (shared) {
+      const reference = this.universe.get(shared.referenceId);
+      const target = this.universe.get(shared.targetId);
+      if (!reference || !target) return;
+      this.camera.position.fromArray(shared.position);
+      this.camera.quaternion.fromArray(shared.orientation);
+      if (this.camera.reference !== reference) this.camera.setReference(reference);
+      this.camera.target = target;
+      this.camera.mode = 'orbit';
+    } else if (this.reach?.directing) {
       this.reach.update(dt, this.time.paused);
     } else {
       this.camera.update(this.reach && this.time.paused ? 0 : dt, this.input, eng.width, eng.height, fovRad);
       this.reach?.update(dt, this.time.paused);
     }
+    if (this.reach && this.panoramaSync) {
+      const countdown = this.reach.countdown;
+      const position = this.camera.position;
+      const orientation = this.camera.quaternion;
+      this.panoramaSync.publish({
+        jd: this.time.jd, rate: this.time.rate, paused: this.time.paused,
+        position: [position.x, position.y, position.z],
+        orientation: [orientation.x, orientation.y, orientation.z, orientation.w],
+        referenceId: this.camera.reference!.id, targetId: this.camera.target!.id,
+        destinationId: countdown.destinationId, phase: countdown.phase, secondsLeft: countdown.secondsLeft,
+      });
+    }
     if (this.reach && now - this.lastReachSave >= 30_000) this.checkpointReach();
+    this.reachCountdown?.update(now);
     this.aimAtPin(dt, fovRad, eng.width / Math.max(1, eng.height));
     // backdrop bookkeeping: start circling once the return flight has arrived; any other flight
     // (or re-targeting) stops the auto-orbit, which ends the backdrop
@@ -1229,7 +1289,7 @@ class App implements UIHost {
     }
     this.overlay.draw(this.bodies.views, eng.camera, this.selected, namedStars, starSel, this.uiVisible, s.galaxies ? this.galaxySprites.named : [], this.blackHoleMarkers(camPos), this.landmarkSprites.named, pin.visible ? pin : null);
     const selDist = this.selected ? this.bodies.byId.get(this.selected.id)?.distance ?? 0 : 0;
-    if (!this.reach) this.ui.update(now, dt, selDist);
+    if (!REACH_MODE) this.ui.update(now, dt, selDist);
   };
 
   /** Hand the most prominent black hole in the current system to the lensing pass. */

@@ -88,6 +88,22 @@ export class ReachVoyageDirector {
 
   get directing(): boolean { return this.stage === 'departure' || this.stage === 'flyby'; }
 
+  get countdown(): { phase: 'NEXT' | 'DEPART' | 'CRUISE'; destinationId: string; routeIndex: number; secondsLeft: number } {
+    if (this.stage === 'departure') {
+      const d = this.departure!;
+      return { phase: 'CRUISE', destinationId: REACH_ITINERARY[d.next].id,
+        routeIndex: d.next, secondsLeft: d.duration - d.elapsed };
+    }
+    const destinationId = REACH_ITINERARY[this.stop].id;
+    if (this.stage === 'flyby') return { phase: 'DEPART', destinationId,
+      routeIndex: this.stop, secondsLeft: this.flyby!.duration - this.flyby!.elapsed };
+    if (this.stage === 'observe') return { phase: 'DEPART', destinationId,
+      routeIndex: this.stop, secondsLeft: this.observeLeft };
+    const flight = this.camera.autopilot;
+    return { phase: 'NEXT', destinationId, routeIndex: this.stop,
+      secondsLeft: flight ? flight.duration - flight.t : 0 };
+  }
+
   constructor(
     private readonly universe: Universe, private readonly camera: CameraController, private readonly time: TimeSystem,
     private readonly timing: ReachTiming,

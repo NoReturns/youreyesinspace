@@ -46,6 +46,25 @@ html, body {
 body { position: fixed; inset: 0; }
 body.reach-mode, body.reach-mode * { cursor: none !important; }
 body.reach-mode #ui { display: none; }
+html.reach-panorama #ui, html.reach-panorama #loader { display: none !important; }
+
+#reach-countdown {
+  position: fixed;
+  z-index: 11;
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #FFD700;
+  font: 500 clamp(10px, 3vw, 14px)/1.3 system-ui, sans-serif;
+  pointer-events: none;
+  user-select: none;
+}
+#reach-countdown[data-position^='top'] { top: calc(16px + env(safe-area-inset-top)); }
+#reach-countdown[data-position^='bottom'] { bottom: calc(16px + env(safe-area-inset-bottom)); }
+#reach-countdown[data-position$='left'] { left: calc(16px + env(safe-area-inset-left)); }
+#reach-countdown[data-position$='right'] { right: calc(16px + env(safe-area-inset-right)); }
+#reach-countdown[data-position$='centre'] { left: 50%; transform: translateX(-50%); }
 
 canvas#scene, canvas#overlay {
   position: fixed;
