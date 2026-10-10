@@ -44,6 +44,8 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 body { position: fixed; inset: 0; }
+body.reach-mode, body.reach-mode * { cursor: none !important; }
+body.reach-mode #ui { display: none; }
 
 canvas#scene, canvas#overlay {
   position: fixed;

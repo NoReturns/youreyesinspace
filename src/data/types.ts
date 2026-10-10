@@ -101,6 +101,8 @@ export type Appearance =
   | {
       kind: 'gas';
       seed: number;
+      /** Locally packaged north-up cylindrical color map; procedural bands remain the fallback. */
+      cylindricalMap?: string;
       bands: Array<[number, number, number]>;
       bandFreq: number;
       turbulence: number;

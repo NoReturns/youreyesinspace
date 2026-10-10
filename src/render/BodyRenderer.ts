@@ -1,7 +1,7 @@
 import {
   AdditiveBlending, AmbientLight, BackSide, Box3, CircleGeometry, Color, CylinderGeometry, DirectionalLight, DoubleSide, FrontSide, Group, Mesh,
-  MeshStandardMaterial, NormalBlending, PlaneGeometry, RingGeometry, Scene, ShaderMaterial, Sphere, SphereGeometry, Vector3, Vector4,
-  type Camera, type IUniform, type Quaternion,
+  MeshStandardMaterial, NormalBlending, PlaneGeometry, RepeatWrapping, RingGeometry, Scene, ShaderMaterial, Sphere, SphereGeometry,
+  SRGBColorSpace, TextureLoader, Vector3, Vector4, type Camera, type IUniform, type Quaternion, type Texture,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
@@ -75,6 +75,7 @@ function ringGapUniforms(body: CelestialBody): Vector4[] {
 const gltfLoader = new GLTFLoader().setDRACOLoader(new DRACOLoader());
 /** Loaded glTF scenes by URL (shared between views, cloned per body) */
 const modelCache = new Map<string, Promise<Group>>();
+const textureLoader = new TextureLoader();
 
 function loadModel(url: string): Promise<Group> {
   let p = modelCache.get(url);
@@ -128,6 +129,7 @@ export class BodyView {
   /** streamed imagery layer, replaces the procedural surface once loaded */
   tiles: TileGlobe | null = null;
   imageryActive = false;
+  private cylindricalTexture: Texture | null = null;
 
   private lit: Uniforms[] = [];
 
@@ -203,9 +205,22 @@ export class BodyView {
           uStorm: { value: a.storm ? new Vector4(a.storm[0] * DEG, a.storm[1] * DEG, a.storm[2], 1) : new Vector4(0, 0, 0, 0) },
           uStormColor: { value: a.storm ? new Vector3(a.storm[3], a.storm[4], a.storm[5]) : new Vector3() },
           uAtmColor: { value: d.atmosphere ? vec3(d.atmosphere.color) : new Vector3(1, 1, 1) },
-          uAtmDensity: { value: d.atmosphere ? d.atmosphere.density : 0 },
+          uAtmDensity: { value: d.id === 'jupiter' ? 0 : d.atmosphere ? d.atmosphere.density : 0 },
+          uCylindricalMap: { value: null },
+          uUseCylindricalMap: { value: 0 },
         },
       });
+      if (a.cylindricalMap) {
+        const url = `${import.meta.env.BASE_URL}${a.cylindricalMap}?v=${__BUILD_ID__}`;
+        const texture = textureLoader.load(url, () => {
+          this.surfaceMat!.uniforms.uUseCylindricalMap.value = 1;
+        }, undefined, (err) => console.warn('Jupiter Cassini map unavailable; using procedural surface', err));
+        texture.colorSpace = SRGBColorSpace;
+        texture.wrapS = RepeatWrapping;
+        texture.anisotropy = maxAnisotropy;
+        this.cylindricalTexture = texture;
+        this.surfaceMat.uniforms.uCylindricalMap.value = texture;
+      }
     } else {
       const lit = lightingUniforms();
       this.lit.push(lit);
@@ -275,7 +290,7 @@ export class BodyView {
     }
 
     // Atmosphere shell
-    if (d.atmosphere) {
+    if (d.atmosphere && d.id !== 'jupiter') {
       this.atmosphereMat = new ShaderMaterial({
         vertexShader: Shaders.atmosphereVert,
         fragmentShader: Shaders.atmosphereFrag,
@@ -388,6 +403,7 @@ export class BodyView {
     if (this.beams) for (const m of this.beams.children) (m as Mesh).geometry.dispose();
     if (this.ground) { this.ground.geometry.dispose(); (this.ground.material as MeshStandardMaterial).dispose(); }
     this.tiles?.dispose();
+    this.cylindricalTexture?.dispose();
     // model geometries/materials stay in the shared cache (procedural ships own theirs)
     if (this.ownsModel && this.model) disposeGroup(this.model);
   }

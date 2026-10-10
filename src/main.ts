@@ -23,8 +23,11 @@ import { Overlay, type StarSelectionScreen } from './render/Overlay';
 import type { NamedStarScreen } from './render/StarPoints';
 import { Input } from './input/Input';
 import { CameraController } from './camera/CameraController';
+import { ReachVoyageDirector, REACH_ITINERARY } from './reach/ReachVoyageDirector';
+import { LocalStorageReachJourneyStore, loadReachJourney, saveReachJourney, type ReachJourneyStore } from './reach/JourneyState';
+import { ReachTiming } from './reach/ReachTiming';
 import { UI, type UIHost } from './ui/UI';
-import { loadSettings, saveSettings, type Settings } from './ui/Settings';
+import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from './ui/Settings';
 import { DAY_S, DEG, PARSEC_KM } from './core/constants';
 import { starLightColor } from './astro/stellar';
 import { fmtDuration, fmtLightYears } from './ui/format';
@@ -39,11 +42,13 @@ const IDENTITY = new Matrix3();
 const TOUR_HOP_S = 1.6;
 /** auto-orbit speed (rad/s) of the opening backdrop */
 const BACKDROP_ORBIT = 0.03;
+const REACH_MODE = new URLSearchParams(window.location.search).get('reach') === '1';
+const REACH_TIMING_MODE = new URLSearchParams(window.location.search).get('timing') === 'test' ? 'test' : 'production';
 
 class App implements UIHost {
   readonly universe: Universe;
   readonly time = new TimeSystem();
-  readonly settings: Settings = loadSettings();
+  readonly settings: Settings = REACH_MODE ? { ...DEFAULT_SETTINGS } : loadSettings();
   readonly engine: Engine;
   readonly starPoints: StarPoints;
   readonly procPoints: ProcStarPoints;
@@ -59,6 +64,9 @@ class App implements UIHost {
   readonly overlay: Overlay;
   readonly input: Input;
   readonly camera: CameraController;
+  readonly reach: ReachVoyageDirector | null;
+  private readonly reachStore: ReachJourneyStore | null = REACH_MODE ? new LocalStorageReachJourneyStore() : null;
+  private lastReachSave = performance.now();
   readonly ui: UI;
   selected: CelestialBody | null = null;
   selectedStar: StarId | null = null;
@@ -105,6 +113,13 @@ class App implements UIHost {
     this.maxPointPx = Math.max(32, Math.min(256, (range?.[1] ?? 64) / this.engine.pixelRatio));
 
     this.universe = new Universe(catalog);
+    const savedJourney = this.reachStore
+      ? loadReachJourney(this.reachStore, REACH_ITINERARY, (id) => !!this.universe.get(id))
+      : null;
+    if (savedJourney) {
+      this.time.setRate(savedJourney.simulation.rate);
+      this.time.jd = savedJourney.simulation.jd;
+    }
     // Evaluate once so orbital elements exist before building renderers
     this.universe.update(this.time.jd, this.time.t);
 
@@ -126,7 +141,7 @@ class App implements UIHost {
     this.bodies = new BodyRenderer(scene, this.engine.renderer.capabilities.getMaxAnisotropy());
     this.points = new BodyPoints(scene);
     this.overlay = new Overlay(overlayCanvas);
-    this.input = new Input(sceneCanvas);
+    this.input = new Input(sceneCanvas, !REACH_MODE);
     this.camera = new CameraController(this.universe);
     this.trajectories = new TrajectoryLines(scene);
     this.missions = new Missions(this.universe, {
@@ -142,7 +157,7 @@ class App implements UIHost {
       // camera where the visitor sent it
       if (why === 'finished') this.showBackdrop(true);
     };
-    this.ui = new UI(this);
+    this.ui = new UI(this, !REACH_MODE);
 
     this.loadSystemRenderables(this.universe.current);
     this.universe.onSystemChange((sys) => this.loadSystemRenderables(sys));
@@ -153,17 +168,29 @@ class App implements UIHost {
 
     // Opening view: the planetary system as a slowly circling backdrop until the visitor picks a
     // destination (and again after a tour has finished)
-    this.showBackdrop(false);
+    if (REACH_MODE) {
+      this.reach = new ReachVoyageDirector(this.universe, this.camera, this.time,
+        new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach());
+      this.uiVisible = false;
+      window.addEventListener('pagehide', () => this.checkpointReach());
+      document.addEventListener('visibilitychange', () => { if (document.hidden) this.checkpointReach(); });
+      this.checkpointReach();
+    } else {
+      this.reach = null;
+      this.showBackdrop(false);
+    }
 
-    this.input.onClick = (x, y, dbl) => this.onClick(x, y, dbl);
-    this.input.onKey = (code, e) => this.onKey(code, e);
-    this.input.onLockChange = (locked) => this.onLockChange(locked);
-    sceneCanvas.addEventListener('pointermove', (e) => {
-      if (e.pointerType !== 'mouse' || this.input.dragging || this.input.locked) { this.overlay.hoverId = null; return; }
-      const b = this.overlay.pick(e.clientX, e.clientY, 16);
-      this.overlay.hoverId = b?.id ?? null;
-      sceneCanvas.style.cursor = b ? 'pointer' : 'default';
-    });
+    if (!REACH_MODE) {
+      this.input.onClick = (x, y, dbl) => this.onClick(x, y, dbl);
+      this.input.onKey = (code, e) => this.onKey(code, e);
+      this.input.onLockChange = (locked) => this.onLockChange(locked);
+      sceneCanvas.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'mouse' || this.input.dragging || this.input.locked) { this.overlay.hoverId = null; return; }
+        const b = this.overlay.pick(e.clientX, e.clientY, 16);
+        this.overlay.hoverId = b?.id ?? null;
+        sceneCanvas.style.cursor = b ? 'pointer' : 'default';
+      });
+    }
 
     // Galaxy-scale state for the first frame
     this.universe.toParsecs(this.camera.position, this.camPc);
@@ -172,6 +199,12 @@ class App implements UIHost {
     this.applySettings();
     requestAnimationFrame(this.frame);
     document.getElementById('loader')?.classList.add('done');
+  }
+
+  private checkpointReach(): void {
+    if (!this.reach || !this.reachStore) return;
+    try { saveReachJourney(this.reachStore, this.reach.capture()); } catch { /* storage must not stop the voyage */ }
+    this.lastReachSave = performance.now();
   }
 
   /**
@@ -829,7 +862,7 @@ class App implements UIHost {
 
   applySettings(): void {
     const s = this.settings;
-    saveSettings(s);
+    if (!REACH_MODE) saveSettings(s);
     this.engine.setFov(s.fov);
     this.engine.bloom.enabled = s.bloom;
     this.engine.setRenderScale(s.renderScale);
@@ -1064,7 +1097,13 @@ class App implements UIHost {
     // Camera
     const eng = this.engine;
     const fovRad = eng.camera.fov * DEG;
-    this.camera.update(dt, this.input, eng.width, eng.height, fovRad);
+    if (this.reach?.directing) {
+      this.reach.update(dt, this.time.paused);
+    } else {
+      this.camera.update(this.reach && this.time.paused ? 0 : dt, this.input, eng.width, eng.height, fovRad);
+      this.reach?.update(dt, this.time.paused);
+    }
+    if (this.reach && now - this.lastReachSave >= 30_000) this.checkpointReach();
     this.aimAtPin(dt, fovRad, eng.width / Math.max(1, eng.height));
     // backdrop bookkeeping: start circling once the return flight has arrived; any other flight
     // (or re-targeting) stops the auto-orbit, which ends the backdrop
@@ -1188,7 +1227,7 @@ class App implements UIHost {
     }
     this.overlay.draw(this.bodies.views, eng.camera, this.selected, namedStars, starSel, this.uiVisible, s.galaxies ? this.galaxySprites.named : [], this.blackHoleMarkers(camPos), this.landmarkSprites.named, pin.visible ? pin : null);
     const selDist = this.selected ? this.bodies.byId.get(this.selected.id)?.distance ?? 0 : 0;
-    this.ui.update(now, dt, selDist);
+    if (!this.reach) this.ui.update(now, dt, selDist);
   };
 
   /** Hand the most prominent black hole in the current system to the lensing pass. */
@@ -1241,6 +1280,11 @@ class App implements UIHost {
 }
 
 async function boot(): Promise<void> {
+  if (REACH_MODE) {
+    document.body.classList.add('reach-mode');
+    const ui = document.getElementById('ui');
+    if (ui) ui.inert = true;
+  }
   const loaderText = document.querySelector('#loader .loader-text');
   try {
     await initI18n();
@@ -1250,8 +1294,8 @@ async function boot(): Promise<void> {
     const catalog = await StarCatalog.load(import.meta.env.BASE_URL);
     if (loaderText) loaderText.textContent = _('Evren hazırlanıyor…');
     const app = new App(catalog);
-    // Expose for debugging / console experiments
-    (window as unknown as { yeits: App }).yeits = app;
+    // Keep the interactive debug handle out of passive Reach mode.
+    if (!REACH_MODE) (window as unknown as { yeits: App }).yeits = app;
   } catch (err) {
     console.error(err);
     if (loaderText) loaderText.textContent = `${_('Yükleme hatası')}: ${(err as Error).message}`;

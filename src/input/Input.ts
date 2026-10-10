@@ -31,7 +31,8 @@ export class Input {
   /** pointer-lock state changed (free roam) */
   onLockChange: ((locked: boolean) => void) | null = null;
 
-  constructor(private readonly el: HTMLElement) {
+  constructor(private readonly el: HTMLElement, interactive = true) {
+    if (!interactive) return;
     el.style.touchAction = 'none';
     el.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointerup', this.onPointerUp);

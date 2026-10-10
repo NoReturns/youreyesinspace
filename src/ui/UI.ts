@@ -149,7 +149,7 @@ export class UI {
   private fpsCount = 0;
   private fps = 0;
 
-  constructor(private readonly host: UIHost) {
+  constructor(private readonly host: UIHost, private readonly interactive = true) {
     this.bindTime();
     this.bindActions();
     this.bindSearch();
@@ -253,7 +253,7 @@ export class UI {
       }
     }
     this.placesBtn.addEventListener('click', (e) => { e.stopPropagation(); this.togglePlaces(); });
-    document.addEventListener('pointerdown', (e) => {
+    if (this.interactive) document.addEventListener('pointerdown', (e) => {
       if (!menu.hidden && !menu.contains(e.target as Node) && e.target !== this.placesBtn) this.togglePlaces(false);
     });
   }
@@ -352,7 +352,7 @@ export class UI {
         list.hidden = true;
       }
     });
-    document.addEventListener('pointerdown', (e) => {
+    if (this.interactive) document.addEventListener('pointerdown', (e) => {
       if (!(e.target as HTMLElement).closest('#search')) list.hidden = true;
     });
   }

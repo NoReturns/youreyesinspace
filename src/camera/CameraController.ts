@@ -30,6 +30,8 @@ interface Autopilot {
   q0: Quaternion;
   /** 'goto': screen-up at arrival (unit); default keeps the roll the flight started with */
   up1?: Vector3;
+  /** Reach departure: ease into the usual flight, matching it by one-quarter duration. */
+  gentleStart?: boolean;
 }
 
 const _v = new Vector3();
@@ -191,8 +193,9 @@ export class CameraController {
    * Fly to an explicit vantage point around a body: `dir1` (unit, from the body) and `dist1` km
    * away, ending in orbit mode around it. Used by guided tours for overviews and surface close-ups.
    * `durationS` overrides the distance-based flight time; `up1` fixes the roll at arrival.
+   * `gentleStart` delays early progress, then rejoins the usual flight at one-quarter duration.
    */
-  goToVantage(body: CelestialBody, dir1: Vector3, dist1: number, durationS?: number, up1?: Vector3): void {
+  goToVantage(body: CelestialBody, dir1: Vector3, dist1: number, durationS?: number, up1?: Vector3, gentleStart = false): void {
     const r0 = _v.copy(this.position).sub(body.position);
     const ratio = Math.max(r0.length(), 1) / dist1;
     const duration = durationS ?? 2.2 + Math.min(4.5, Math.abs(Math.log10(ratio)) * 0.9);
@@ -200,6 +203,7 @@ export class CameraController {
       kind: 'goto', target: body, point: null, t: 0, duration,
       r0: r0.clone(), dir1: dir1.clone().normalize(), dist1, q0: this.quaternion.clone(),
       up1: up1?.clone().normalize(),
+      gentleStart,
     };
     this.autoOrbit = 0;
     this.setReference(body);
@@ -315,7 +319,9 @@ export class CameraController {
     if (this.autopilot) {
       const ap = this.autopilot;
       ap.t += dt;
-      const s = smoothstep(ap.t / ap.duration);
+      const raw = Math.min(1, ap.t / ap.duration);
+      const progress = ap.gentleStart && raw < 0.25 ? raw * smoothstep(raw / 0.25) : raw;
+      const s = smoothstep(progress);
       const tgt = ap.target;
       const tgtPos = tgt ? tgt.position : ap.point;
       if (ap.kind === 'centerDir' || !tgtPos) {

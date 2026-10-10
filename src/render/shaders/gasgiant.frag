@@ -10,6 +10,9 @@ uniform vec4 uStorm;        // lat(rad), lon(rad), size, enabled
 uniform vec3 uStormColor;
 uniform vec3 uAtmColor;
 uniform float uAtmDensity;
+uniform sampler2D uCylindricalMap;
+uniform float uUseCylindricalMap;
+uniform float uFlattening;
 
 varying vec3 vObjPos;
 varying vec3 vWorldPos;
@@ -36,6 +39,14 @@ void main() {
   float lat = asin(clamp(p.y, -1.0, 1.0));
   float lon = atan(p.z, p.x);
 
+  vec3 albedo;
+  if (uUseCylindricalMap > 0.5) {
+    // PIA07782: north-up, 360-degree cylindrical map in planetocentric latitude.
+    vec3 surface = normalize(vec3(p.x, p.y * (1.0 - uFlattening), p.z));
+    float u = fract(atan(p.z, -p.x) / 6.2831853 + 1.0);
+    float v = 0.5 + asin(clamp(surface.y, -1.0, 1.0)) / 3.14159265;
+    albedo = texture2D(uCylindricalMap, vec2(u, v)).rgb;
+  } else {
   // Zonal flow: shear increases with latitude; time-animated drift
   float drift = uTime * 0.02 * (0.5 + cos(lat * 3.0));
   vec3 q = vec3(p.x, p.y * 4.0, p.z);
@@ -43,7 +54,7 @@ void main() {
   float swirl = fbm(vec3(lon * 2.0 + drift * 3.0, lat * 12.0, uSeed), 3) * uTurbulence * 0.35;
 
   float k = (p.y * 0.5 + 0.5) * uBandFreq + warp * 0.9 + swirl;
-  vec3 albedo = bandColor(k);
+  albedo = bandColor(k);
 
   // Fine streaks stretched along longitude
   float streak = snoise(vec3(lon * 2.0 + drift * 2.0, lat * 60.0 + warp * 6.0, uSeed * 3.0)) * 0.09
@@ -71,6 +82,7 @@ void main() {
     // turbulent wake
     float wake = smoothstep(2.4, 1.0, r) * (1.0 - mask) * smoothstep(0.0, 0.5, abs(spiral));
     albedo = mix(albedo, albedo * 0.85 + stormCol * 0.15, wake * 0.6);
+  }
   }
 
   // Lighting

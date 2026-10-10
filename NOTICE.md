@@ -28,6 +28,14 @@ no third-party model or artwork is bundled. NASA material is generally not copyr
 [NASA media usage guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/) apply:
 the NASA insignia and name must not be used in a way that implies endorsement.
 
+## Bundled planetary imagery
+
+* `public/textures/jupiter-pia07782.jpg` is the unmodified cylindrical Jupiter map
+  [PIA07782](https://www.jpl.nasa.gov/images/pia07782-cassinis-best-maps-of-jupiter-cylindrical-map/)
+  from Cassini. Credit: NASA/JPL/Space Science Institute. Use is subject to the
+  [JPL image use policy](https://www.jpl.nasa.gov/jpl-image-use-policy/);
+  no NASA, JPL or Caltech endorsement is implied.
+
 ## Streamed imagery (not bundled)
 
 Loaded at runtime directly from NASA servers; see `src/data/imagery.ts`.

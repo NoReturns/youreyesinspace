@@ -1,0 +1,255 @@
+import assert from 'node:assert/strict';
+import { rolldown } from 'rolldown';
+import { Vector3 } from 'three';
+import * as THREE from 'three';
+
+// Bundle the production TypeScript in memory so this test needs no runner or new dependency.
+const entry = `
+  export { ReachVoyageDirector, REACH_ITINERARY } from './src/reach/ReachVoyageDirector.ts';
+  export { CameraController } from './src/camera/CameraController.ts';
+  export { StarSystem } from './src/core/StarSystem.ts';
+  export { TimeSystem } from './src/core/TimeSystem.ts';
+  export { SOLAR_SYSTEM } from './src/data/solarSystem.ts';
+  export { ReachTiming, REACH_TIMING, reachTravelKind } from './src/reach/ReachTiming.ts';
+  export { loadReachJourney, parseReachJourney, saveReachJourney } from './src/reach/JourneyState.ts';
+`;
+const bundle = await rolldown({
+  input: '\0reach-journey-test',
+  external: (id) => id === 'three' || id.includes('i18n'),
+  plugins: [{
+    name: 'reach-journey-test',
+    resolveId(id) { if (id === '\0reach-journey-test') return id; },
+    load(id) { if (id === '\0reach-journey-test') return entry; },
+  }],
+});
+const output = await bundle.generate({ format: 'cjs' });
+const module = { exports: {} };
+new Function('require', 'module', 'exports', output.output[0].code)(
+  (id) => id === 'three' ? THREE : { _: (text) => text, fixed: String }, module, module.exports,
+);
+const {
+  ReachVoyageDirector, REACH_ITINERARY, CameraController, StarSystem, TimeSystem, SOLAR_SYSTEM,
+  ReachTiming, REACH_TIMING, reachTravelKind, loadReachJourney, parseReachJourney, saveReachJourney,
+} = module.exports;
+
+const route = REACH_ITINERARY;
+const input = { flush: () => ({ dx: 0, dy: 0, wheel: 0, pinch: 0, panX: 0, panY: 0 }), down: () => false };
+const date = '2026-10-10T00:00:00Z';
+
+function makeRun(saved = null, { mode = 'test', random = () => 0.5, onPhaseChange } = {}) {
+  const time = new TimeSystem(new Date(date));
+  if (saved) { time.setRate(saved.simulation.rate); time.jd = saved.simulation.jd; }
+  const system = new StarSystem('sol', 'c0', 0, new Vector3(), SOLAR_SYSTEM, [], []);
+  system.update(time.jd, time.t);
+  const universe = {
+    current: system,
+    get: (id) => system.get(id),
+    get star() { return system.star; },
+    nearestBody: (position) => system.nearestBody(position),
+  };
+  const camera = new CameraController(universe);
+  const director = new ReachVoyageDirector(universe, camera, time, new ReachTiming(mode, random), saved, onPhaseChange);
+  return { time, system, universe, camera, director };
+}
+
+function step(run) {
+  const dt = 0.1;
+  run.time.advance(dt);
+  run.system.update(run.time.jd, run.time.t);
+  if (run.director.directing) run.director.update(dt, false);
+  else {
+    run.camera.update(dt, input, 1920, 1080, Math.PI / 3);
+    run.director.update(dt, false);
+  }
+}
+
+function until(run, match, limit = 40_000) {
+  for (let i = 0; i < limit; i++) {
+    step(run);
+    const state = run.director.capture();
+    if (match(state)) return state;
+  }
+  throw new Error('Requested journey phase was not reached');
+}
+
+function compare(run, resumed, label) {
+  assert.equal(resumed.time.jd, run.time.jd, `${label}: Julian date`);
+  assert.equal(resumed.time.rate, run.time.rate, `${label}: time rate`);
+  assert.ok(resumed.camera.position.distanceTo(run.camera.position) < 1e-8, `${label}: restored position`);
+  assert.ok(1 - Math.abs(resumed.camera.quaternion.dot(run.camera.quaternion)) < 1e-12, `${label}: restored orientation`);
+  assert.equal(resumed.camera.reference?.id, run.camera.reference?.id, `${label}: camera reference`);
+  assert.equal(resumed.camera.target?.id, run.camera.target?.id, `${label}: camera target`);
+  const phase = run.director.capture().phase;
+  const steps = Math.ceil((phase.duration - phase.elapsed) / 0.1) + 20;
+  for (let i = 0; i < steps; i++) {
+    step(run);
+    step(resumed);
+    assert.ok(resumed.camera.position.distanceTo(run.camera.position) < 1e-4, `${label}: continuing position at step ${i}`);
+    assert.ok(1 - Math.abs(resumed.camera.quaternion.dot(run.camera.quaternion)) < 1e-10, `${label}: continuing orientation at step ${i}`);
+    const a = run.director.capture().phase;
+    const b = resumed.director.capture().phase;
+    assert.equal(b.kind, a.kind, `${label}: continuing phase`);
+    assert.ok(Math.abs((b.duration - b.elapsed) - (a.duration - a.elapsed)) < 1e-8, `${label}: remaining time`);
+  }
+}
+
+let changes = 0;
+const fresh = makeRun(null, { onPhaseChange: () => changes++ });
+assert.equal(fresh.director.capture().destinationId, 'earth');
+assert.equal(fresh.director.capture().phase.kind, 'observe');
+assert.equal(loadReachJourney({ read: () => null, write() {} }, route, (id) => !!fresh.universe.get(id)), null);
+console.log('PASS fresh Earth opening without save data');
+
+const cases = [
+  ['planet observation', (s) => s.destinationId === 'mars' && s.phase.kind === 'observe' && s.phase.elapsed >= 5],
+  ['departure', (s) => s.destinationId === 'earth' && s.phase.kind === 'departure' && s.phase.elapsed >= 5],
+  ['interplanetary cruise', (s) => s.destinationId === 'mars' && s.phase.kind === 'cruise' && s.phase.elapsed >= s.phase.duration / 2],
+  ['moving moon flyby', (s) => s.destinationId === 'moon' && s.phase.kind === 'flyby' && s.phase.elapsed >= 5],
+  ['Pioneer observation', (s) => s.destinationId === 'pioneer11' && s.phase.kind === 'observe' && s.phase.elapsed >= 5],
+  ['Voyager observation', (s) => s.destinationId === 'voyager1' && s.phase.kind === 'observe' && s.phase.elapsed >= 5],
+];
+for (const [label, match] of cases) {
+  const run = makeRun();
+  const captured = until(run, match);
+  let raw = null;
+  const store = { read: () => raw, write: (json) => { raw = json; } };
+  assert.equal(saveReachJourney(store, captured), true);
+  const parsed = loadReachJourney(store, route, (id) => !!run.universe.get(id));
+  assert.ok(parsed, `${label}: saved state validates`);
+  assert.deepEqual(parsed.phase, captured.phase, `${label}: phase data survives JSON`);
+  const resumed = makeRun(parsed);
+  compare(run, resumed, label);
+  console.log(`PASS ${label} save, restore, remaining duration, and continuity through the next phase`);
+}
+until(fresh, (s) => s.phase.kind === 'departure');
+assert.ok(changes > 0, 'phase changes must trigger checkpoint callback');
+
+const valid = fresh.director.capture();
+const hasBody = (id) => !!fresh.universe.get(id);
+assert.equal(parseReachJourney('{bad json', route, hasBody), null);
+assert.equal(parseReachJourney(JSON.stringify({ ...valid, schema: 2 }), route, hasBody), null);
+assert.equal(parseReachJourney(JSON.stringify({ ...valid, itinerary: { ...valid.itinerary, version: 2 } }), route, hasBody), null);
+assert.equal(parseReachJourney(JSON.stringify({ ...valid, destinationId: 'removed' }), route, hasBody), null);
+assert.equal(parseReachJourney(JSON.stringify(valid), route, (id) => id !== 'earth' && hasBody(id)), null);
+assert.equal(parseReachJourney(JSON.stringify({ ...valid, camera: { ...valid.camera, orientation: [0, 0, 0, 0] } }), route, hasBody), null);
+assert.equal(parseReachJourney(JSON.stringify({ ...valid, destinationId: 'moon',
+  camera: { ...valid.camera, referenceId: 'moon', targetId: 'moon' },
+  phase: { kind: 'observe', elapsed: 1, duration: 12 } }), route, hasBody), null);
+const reordered = parseReachJourney(JSON.stringify({ ...valid, routeIndex: 4 }), [...route].reverse(), hasBody);
+assert.ok(reordered);
+assert.equal(makeRun(reordered).director.capture().destinationId, 'earth');
+assert.equal(makeRun(reordered).director.capture().routeIndex, 0);
+const unavailable = { read() { throw new Error('blocked'); }, write() { throw new Error('blocked'); } };
+assert.equal(loadReachJourney(unavailable, route, hasBody), null);
+assert.equal(saveReachJourney(unavailable, valid), false);
+step(fresh);
+console.log('PASS corrupt, incompatible, removed-body, invalid-quaternion, reordered-index, and unavailable-storage fallbacks');
+
+assert.equal(route.length, 41);
+assert.equal(reachTravelKind(route.find((stop) => stop.id === 'moon')), 'moon');
+assert.equal(reachTravelKind(route.find((stop) => stop.id === 'mars')), 'planet');
+assert.equal(reachTravelKind(route.find((stop) => stop.id === 'neptune')), 'distant');
+assert.equal(reachTravelKind(route.find((stop) => stop.id === 'voyager1')), 'probe');
+for (const stop of route) {
+  for (const value of [0, 0.37, 1, Number.NaN]) {
+    const production = new ReachTiming('production', () => value);
+    const travel = production.travel(stop);
+    const observe = production.observe(stop);
+    const [travelMin, travelMax] = REACH_TIMING.production.travel[reachTravelKind(stop)];
+    const [observeMin, observeMax] = REACH_TIMING.production.observe[stop.profile];
+    assert.ok(Number.isFinite(travel) && travel > 0 && travel >= travelMin && travel <= travelMax);
+    assert.ok(Number.isFinite(observe) && observe > 0 && observe >= observeMin && observe <= observeMax);
+    const test = new ReachTiming('test', () => value);
+    assert.equal(test.travel(stop), 30);
+    assert.equal(test.observe(stop), 8);
+    assert.equal(test.departure(stop), stop.profile === 'moon' ? 7 : 10);
+  }
+}
+console.log('PASS production bounds, test durations, and non-finite random input for all 41 stops');
+
+const circuit = makeRun();
+const visited = new Set(['earth']);
+const travelled = new Set();
+for (let i = 0; i < 25_000 && (visited.size < 41 || travelled.size < 41); i++) {
+  step(circuit);
+  const state = circuit.director.capture();
+  if (state.phase.kind === 'cruise') {
+    assert.equal(state.phase.duration, 30);
+    travelled.add(state.destinationId);
+  }
+  if (state.phase.kind === 'observe' || state.phase.kind === 'flyby') {
+    assert.equal(state.phase.duration, 8);
+    visited.add(state.destinationId);
+  }
+}
+assert.equal(visited.size, 41);
+assert.equal(travelled.size, 41);
+console.log('PASS all 41 test-mode arrivals and travel legs');
+
+let productionDraws = 0;
+const production = makeRun(null, { mode: 'production', random: () => { productionDraws++; return 0.37; } });
+const originalDuration = production.director.capture().phase.duration;
+assert.equal(productionDraws, 1);
+for (let i = 0; i < 20; i++) step(production);
+assert.equal(productionDraws, 1);
+const savedProduction = production.director.capture();
+let resumeDraws = 0;
+const resumedProduction = makeRun(savedProduction, { mode: 'production', random: () => { resumeDraws++; return 1; } });
+assert.equal(resumeDraws, 0);
+assert.equal(resumedProduction.director.capture().phase.duration, originalDuration);
+assert.equal(resumedProduction.director.capture().phase.elapsed, savedProduction.phase.elapsed);
+assert.ok(resumedProduction.camera.position.distanceTo(production.camera.position) < 1e-8);
+until(resumedProduction, (s) => s.destinationId === 'moon' && s.phase.kind === 'cruise');
+assert.equal(resumeDraws, 1);
+assert.equal(resumedProduction.director.capture().phase.duration, 180);
+console.log('PASS production timing draws once per new phase and never rerolls on resume');
+
+const testFlight = makeRun();
+const savedFlight = until(testFlight, (s) => s.destinationId === 'moon'
+  && s.phase.kind === 'cruise' && s.phase.elapsed >= 15);
+let switchedDraws = 0;
+const switched = makeRun(savedFlight, { mode: 'production', random: () => { switchedDraws++; return 1; } });
+assert.equal(switchedDraws, 0);
+assert.equal(switched.director.capture().phase.duration, 30);
+assert.equal(switched.director.capture().phase.elapsed, savedFlight.phase.elapsed);
+assert.ok(switched.camera.position.distanceTo(testFlight.camera.position) < 1e-8);
+for (let i = 0; i < 100; i++) {
+  step(testFlight);
+  step(switched);
+  assert.ok(switched.camera.position.distanceTo(testFlight.camera.position) < 1e-4);
+}
+until(switched, (s) => s.destinationId === 'moon' && s.phase.kind === 'flyby');
+assert.equal(switched.director.capture().phase.duration, 30);
+assert.equal(switchedDraws, 1);
+console.log('PASS test-to-production switch preserves active flight and applies to the next flyby');
+
+const productionOpening = makeRun(null, { mode: 'production', random: () => 0.5 });
+for (let i = 0; i < 20; i++) step(productionOpening);
+const openingSave = productionOpening.director.capture();
+const switchedToTest = makeRun(openingSave, { mode: 'test' });
+assert.equal(switchedToTest.director.capture().phase.duration, openingSave.phase.duration);
+assert.equal(switchedToTest.director.capture().phase.elapsed, openingSave.phase.elapsed);
+assert.ok(switchedToTest.camera.position.distanceTo(productionOpening.camera.position) < 1e-8);
+until(switchedToTest, (s) => s.destinationId === 'moon' && s.phase.kind === 'cruise');
+assert.equal(switchedToTest.director.capture().phase.duration, 30);
+until(switchedToTest, (s) => s.destinationId === 'moon' && s.phase.kind === 'flyby');
+assert.equal(switchedToTest.director.capture().phase.duration, 8);
+console.log('PASS production-to-test switch retains observation, then uses 30-second travel and 8-second flyby');
+
+const legacy = structuredClone(savedFlight);
+legacy.phase.duration = 32;
+legacy.phase.elapsed = 16;
+legacy.camera.flight.duration = 32;
+legacy.camera.flight.elapsed = 16;
+const parsedLegacy = parseReachJourney(JSON.stringify(legacy), route, hasBody);
+assert.ok(parsedLegacy, 'legacy v1 checkpoint should parse without new timing fields');
+let legacyDraws = 0;
+const resumedLegacy = makeRun(parsedLegacy, { mode: 'production', random: () => { legacyDraws++; return 0.5; } });
+assert.equal(legacyDraws, 0);
+assert.equal(resumedLegacy.director.capture().phase.duration, 32);
+assert.equal(resumedLegacy.director.capture().phase.elapsed, 16);
+assert.ok(resumedLegacy.camera.position.distanceTo(new Vector3().fromArray(legacy.camera.position)) < 1e-8);
+until(resumedLegacy, (s) => s.destinationId === 'moon' && s.phase.kind === 'flyby');
+assert.equal(resumedLegacy.director.capture().phase.duration, 21);
+assert.equal(legacyDraws, 1);
+console.log('PASS legacy v1 cruise retains its duration and adopts the selected profile afterward');

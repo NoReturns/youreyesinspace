@@ -1,0 +1,129 @@
+export const REACH_JOURNEY_KEY = 'the-reach:journey:v1';
+export const REACH_ITINERARY_ID = 'solar-system-41';
+export const REACH_ITINERARY_VERSION = 1;
+
+export type Vec3 = [number, number, number];
+export type Quat = [number, number, number, number];
+
+interface TimedPhase { elapsed: number; duration: number }
+export type JourneyPhase =
+  | ({ kind: 'observe' } & TimedPhase)
+  | ({ kind: 'flyby'; bodyId: string; offset: Vec3; orientation: Quat; up: Vec3 } & TimedPhase)
+  | ({ kind: 'departure'; sourceId: string; nextId: string; offset: Vec3; orientation: Quat;
+       up: Vec3; orbitRate: number; radialSpeed: number; endRadius: number } & TimedPhase)
+  | ({ kind: 'cruise' } & TimedPhase);
+
+export interface ReachFlightState {
+  targetId: string;
+  elapsed: number;
+  duration: number;
+  startOffset: Vec3;
+  endDirection: Vec3;
+  endDistance: number;
+  startOrientation: Quat;
+  up: Vec3 | null;
+  gentleStart: boolean;
+}
+
+export interface ReachJourneyState {
+  schema: 1;
+  itinerary: { id: string; version: number };
+  destinationId: string;
+  routeIndex: number;
+  phase: JourneyPhase;
+  simulation: { jd: number; rate: number };
+  frame: { starId: string };
+  camera: {
+    position: Vec3;
+    orientation: Quat;
+    referenceId: string;
+    targetId: string;
+    autoOrbit: number;
+    flight: ReachFlightState | null;
+  };
+}
+
+/** Replaceable persistence boundary for the eventual native JourneyStateStore. */
+export interface ReachJourneyStore {
+  read(): string | null;
+  write(json: string): void;
+}
+
+export interface ReachRouteStop { id: string; profile: string }
+
+export class LocalStorageReachJourneyStore implements ReachJourneyStore {
+  read(): string | null { return window.localStorage.getItem(REACH_JOURNEY_KEY); }
+  write(json: string): void { window.localStorage.setItem(REACH_JOURNEY_KEY, json); }
+}
+
+const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const vec3 = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3
+  && v.every((n) => finite(n) && Math.abs(n) < 1e15);
+const nonzeroVec = (v: unknown): v is Vec3 => vec3(v) && v.some((n) => n !== 0);
+const quat = (v: unknown): v is Quat => Array.isArray(v) && v.length === 4 && v.every(finite)
+  && Math.abs(v.reduce((sum: number, n: number) => sum + n * n, 0) - 1) < 1e-3;
+const unit = (v: unknown): v is Vec3 => vec3(v)
+  && Math.abs(v.reduce((sum: number, n: number) => sum + n * n, 0) - 1) < 1e-3;
+const duration = (v: unknown): v is number => finite(v) && v > 0 && v <= 1000;
+const progress = (v: unknown, length: number): v is number => finite(v) && v >= 0 && v <= length;
+
+export function parseReachJourney(raw: string | null, route: readonly ReachRouteStop[], hasBody: (id: string) => boolean): ReachJourneyState | null {
+  if (raw === null) return null;
+  let state: unknown;
+  try { state = JSON.parse(raw); } catch { return null; }
+  const destination = record(state) && typeof state.destinationId === 'string'
+    ? route.find((stop) => stop.id === state.destinationId) : undefined;
+  if (!record(state) || state.schema !== 1 || !record(state.itinerary)
+    || state.itinerary.id !== REACH_ITINERARY_ID || state.itinerary.version !== REACH_ITINERARY_VERSION
+    || typeof state.destinationId !== 'string' || !destination
+    || !hasBody(state.destinationId) || !Number.isInteger(state.routeIndex) || !finite(state.routeIndex)
+    || state.routeIndex < 0 || state.routeIndex >= route.length
+    || !record(state.simulation) || !finite(state.simulation.jd)
+    || state.simulation.jd < 2_000_000 || state.simulation.jd > 3_000_000
+    || !finite(state.simulation.rate) || state.simulation.rate <= 0 || state.simulation.rate > 1_000_000
+    || !record(state.frame) || state.frame.starId !== 'c0'
+    || !record(state.camera) || !vec3(state.camera.position) || !quat(state.camera.orientation)
+    || typeof state.camera.referenceId !== 'string' || !hasBody(state.camera.referenceId)
+    || typeof state.camera.targetId !== 'string' || !hasBody(state.camera.targetId)
+    || state.camera.referenceId !== state.destinationId || state.camera.targetId !== state.destinationId
+    || !finite(state.camera.autoOrbit) || Math.abs(state.camera.autoOrbit) > 1
+    || !record(state.phase) || !duration(state.phase.duration)
+    || !progress(state.phase.elapsed, state.phase.duration)) return null;
+
+  const phase = state.phase;
+  if (phase.kind !== 'observe' && state.camera.autoOrbit !== 0) return null;
+  if (phase.kind === 'observe') {
+    if (destination.profile === 'moon' || state.camera.flight !== null) return null;
+  } else if (phase.kind === 'flyby') {
+    if (destination.profile !== 'moon' || phase.bodyId !== state.destinationId
+      || !nonzeroVec(phase.offset) || !quat(phase.orientation)
+      || !unit(phase.up) || state.camera.flight !== null) return null;
+  } else if (phase.kind === 'departure') {
+    if (phase.sourceId !== state.destinationId || typeof phase.nextId !== 'string'
+      || !route.some((stop) => stop.id === phase.nextId) || !hasBody(phase.nextId)
+      || !nonzeroVec(phase.offset) || !quat(phase.orientation) || !unit(phase.up)
+      || !finite(phase.orbitRate) || Math.abs(phase.orbitRate) > 1
+      || !finite(phase.radialSpeed) || !finite(phase.endRadius) || phase.endRadius <= 0 || phase.endRadius >= 1e15
+      || state.camera.flight !== null) return null;
+  } else if (phase.kind === 'cruise') {
+    const flight = state.camera.flight;
+    if (!record(flight) || flight.targetId !== state.destinationId
+      || !duration(flight.duration) || !progress(flight.elapsed, flight.duration)
+      || flight.duration !== phase.duration || flight.elapsed !== phase.elapsed
+      || !nonzeroVec(flight.startOffset) || !unit(flight.endDirection)
+      || !finite(flight.endDistance) || flight.endDistance <= 0 || flight.endDistance >= 1e15
+      || !quat(flight.startOrientation) || (flight.up !== null && !unit(flight.up))
+      || typeof flight.gentleStart !== 'boolean') return null;
+  } else return null;
+
+  return state as unknown as ReachJourneyState;
+}
+
+export function loadReachJourney(store: ReachJourneyStore, route: readonly ReachRouteStop[], hasBody: (id: string) => boolean): ReachJourneyState | null {
+  try { return parseReachJourney(store.read(), route, hasBody); } catch { return null; }
+}
+
+export function saveReachJourney(store: ReachJourneyStore, state: ReachJourneyState): boolean {
+  try { store.write(JSON.stringify(state)); return true; } catch { return false; }
+}
