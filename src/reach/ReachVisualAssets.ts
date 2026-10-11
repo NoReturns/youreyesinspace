@@ -51,12 +51,20 @@ export function readReachVisualAssets(): ReachVisualAssets {
   return { mode, assets };
 }
 
+export function selectReachAsset(bodyId: string, visuals: ReachVisualAssets, viewportPixels: number): HostAsset | undefined {
+  if (visuals.mode !== 'enhanced') return undefined;
+  const available = visuals.assets.filter(a => a.destinationBodyId === bodyId);
+  const preferredWidth = viewportPixels > 2048 ? 4096 : 2048;
+  return available.find(a => a.width === preferredWidth)
+    ?? available.find(a => a.width === 4096)
+    ?? available.find(a => a.width === 2048)
+    ?? available[0];
+}
+
 export function reachImagery(bodyId: string, visuals: ReachVisualAssets): BodyImagery | undefined {
   if (visuals.mode === 'procedural') return undefined;
   const bundled = BUNDLED[bodyId];
-  const enhanced = visuals.mode === 'enhanced'
-    ? visuals.assets.find(a => a.destinationBodyId === bodyId && a.assetId === `${bodyId}-day-high`)
-    : undefined;
+  const enhanced = selectReachAsset(bodyId, visuals, window.innerWidth * window.devicePixelRatio);
   if (!bundled && !enhanced) return undefined;
   const local = bundled ? `${import.meta.env.BASE_URL}${bundled.path}` : undefined;
   const url = enhanced?.url ?? local!;

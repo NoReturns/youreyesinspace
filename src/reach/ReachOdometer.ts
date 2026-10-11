@@ -31,7 +31,7 @@ export function formatVoyageDistance(km: number): string {
   return `${value.toLocaleString('en-US', { maximumFractionDigits: digits })} ${unit}`;
 }
 
-/** Use the opposite row so long countdown names cannot overlap the two-line odometer. */
+/** Use the opposite row so long countdown names cannot overlap the odometer. */
 export function resolveOdometerPosition(countdown: CountdownPosition | 'auto', routeIndex: number): CountdownPosition {
   const occupied = resolveCountdownPosition(countdown, routeIndex);
   const row = occupied.startsWith('top') ? COUNTDOWN_POSITIONS.slice(3) : COUNTDOWN_POSITIONS.slice(0, 3);
@@ -67,7 +67,7 @@ export class ReachOdometerOverlay {
     }
     if (now - this.lastUpdate < 1000) return;
     this.lastUpdate = now;
-    const text = `Distance Travelled: ${formatVoyageDistance(this.director.distanceTravelledKm)}\nRound-Trips: ${this.director.roundTrips}`;
+    const text = `Distance Travelled: ${formatVoyageDistance(this.director.distanceTravelledKm)}`;
     if (this.element.textContent !== text) this.element.textContent = text;
   }
 }

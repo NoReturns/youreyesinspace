@@ -1471,7 +1471,7 @@ async function boot(): Promise<void> {
   try {
     await initI18n();
     applyDom();
-    document.title = _('Your Eyes In Space — Gözlemlenebilir evreni tarayıcıda gez');
+    document.title = REACH_MODE ? 'The Reach Screensaver' : _('Your Eyes In Space — Gözlemlenebilir evreni tarayıcıda gez');
     if (loaderText) loaderText.textContent = _('Yıldız kataloğu yükleniyor…');
     const catalog = await StarCatalog.load(import.meta.env.BASE_URL);
     if (loaderText) loaderText.textContent = _('Evren hazırlanıyor…');
