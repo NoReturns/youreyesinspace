@@ -66,6 +66,9 @@ export class StarPoints {
         uPixelRatio: { value: 1 },
         uSkyRadius: { value: SKY_RADIUS_KM },
         uHideIndex: { value: 0 },
+        uReachTargetIndex: { value: -1 },
+        uReachTargetOpacity: { value: 1 },
+        uReachTargetDirection: { value: new Vector3(0, 0, 1) },
         uMagLimit: { value: 8.5 },
         uSoftness: { value: 0.0 },
       },
@@ -112,10 +115,14 @@ export class StarPoints {
    * @param camPc camera position in parsecs (scene frame, relative to the Sun)
    * @param hideIndex catalogue index of the current system's star
    */
-  update(camPc: Vector3, hideIndex: number): void {
+  update(camPc: Vector3, hideIndex: number, reachTargetIndex = -1, reachTargetOpacity = 1,
+    reachTargetDirection: Vector3 | null = null): void {
     this.camPc.copy(camPc);
     this.mat.uniforms.uCamPc.value.copy(camPc);
     this.mat.uniforms.uHideIndex.value = hideIndex;
+    this.mat.uniforms.uReachTargetIndex.value = reachTargetIndex;
+    this.mat.uniforms.uReachTargetOpacity.value = reachTargetOpacity;
+    if (reachTargetDirection) this.mat.uniforms.uReachTargetDirection.value.copy(reachTargetDirection).normalize();
 
     // Named-star label candidates (bright from here)
     this.namedStars.length = 0;

@@ -22,6 +22,7 @@ export interface ReachPanoramaFrame {
   jd: number;
   rate: number;
   paused: boolean;
+  starId: string;
   position: [number, number, number];
   orientation: [number, number, number, number];
   referenceId: string;
@@ -84,6 +85,7 @@ function validFrame(value: unknown): value is ReachPanoramaFrame {
   if (!record(value) || !integer(value.sequence) || value.sequence < 0
     || typeof value.jd !== 'number' || !Number.isFinite(value.jd)
     || !positive(value.rate) || typeof value.paused !== 'boolean'
+    || typeof value.starId !== 'string' || !/^[cplb][a-z0-9-]+$/.test(value.starId)
     || !Array.isArray(value.position) || value.position.length !== 3
     || !value.position.every(n => typeof n === 'number' && Number.isFinite(n))
     || !Array.isArray(value.orientation) || value.orientation.length !== 4

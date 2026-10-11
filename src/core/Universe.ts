@@ -15,6 +15,7 @@ import { PARSEC_KM } from './constants';
 import { _ } from '../i18n';
 import type { CelestialBody } from './CelestialBody';
 import { StarSystem } from './StarSystem';
+import { reachArrivalTraceEnabled } from '../reach/ReachArrivalTrace';
 
 const _v = new Vector3();
 
@@ -283,6 +284,7 @@ export class Universe {
   system(id: StarId): StarSystem {
     const cached = this.cache.get(id);
     if (cached) return cached;
+    const started = reachArrivalTraceEnabled() && id === 'c64548' ? performance.now() : 0;
     let sys: StarSystem;
     const ci = catalogIndexOf(id);
     const ex = this.extraSystems.get(id);
@@ -318,6 +320,8 @@ export class Universe {
       }
     }
     this.cache.set(id, sys);
+    if (started) console.info('[reach-arrival-event]', JSON.stringify({ name: 'system-generation',
+      atMs: Math.round(performance.now()), durationMs: Math.round((performance.now() - started) * 100) / 100 }));
     return sys;
   }
 
@@ -332,11 +336,14 @@ export class Universe {
   switchTo(id: StarId, jd: number, tSeconds: number): Vector3 {
     const prev = this.current;
     if (prev.starId === id) return new Vector3();
+    const started = reachArrivalTraceEnabled() && id === 'c64548' ? performance.now() : 0;
     const next = this.system(id);
     next.update(jd, tSeconds);
     const delta = new Vector3().copy(prev.origin).sub(next.origin);
     this.current = next;
     for (const fn of this.listeners) fn(next, prev);
+    if (started) console.info('[reach-arrival-event]', JSON.stringify({ name: 'system-switch-with-listeners',
+      atMs: Math.round(performance.now()), durationMs: Math.round((performance.now() - started) * 100) / 100 }));
     return delta;
   }
 

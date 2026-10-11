@@ -10,10 +10,12 @@ import {
   REACH_ITINERARY_ID, REACH_ITINERARY_VERSION,
   type JourneyPhase, type Quat, type ReachFlightState, type ReachJourneyState, type Vec3,
 } from './JourneyState';
-import { ReachTiming, type ReachTimingDestination } from './ReachTiming';
+import { ReachTiming } from './ReachTiming';
 import { geometricLegKm, type ReachDistanceLeg } from './ReachOdometer';
+import { destinationRef, destinationSystem, type ReachRoute, type ReachStop } from './ReachDestinations';
+import { reachArrivalTraceEnabled } from './ReachArrivalTrace';
 
-type Stop = ReachTimingDestination;
+type Stop = ReachStop;
 
 // Route order and presentation profile only. Durations come from ReachTiming.
 export const REACH_ITINERARY: readonly Stop[] = [
@@ -60,6 +62,10 @@ export const REACH_ITINERARY: readonly Stop[] = [
   { id: 'venus', profile: 'planet' },
 ];
 
+export const REACH_PRODUCTION_ROUTE: ReachRoute = {
+  id: REACH_ITINERARY_ID, version: REACH_ITINERARY_VERSION, stops: REACH_ITINERARY, repeat: true,
+};
+
 const OBSERVATION_ORBIT = 0.012;
 const MOON_FLYBY_RATE = 0.025;
 const MIN_SUNLIT_DOT = 0.2; // correct views with less than 60% of the disk visible
@@ -71,7 +77,7 @@ function smoothstep(t: number): number {
 const vec = (v: Vector3): Vec3 => [v.x, v.y, v.z];
 const quat = (q: Quaternion): Quat => [q.x, q.y, q.z, q.w];
 
-/** A passive, repeating Solar System voyage, independent of missions and tours. */
+/** A passive voyage, independent of missions and tours. */
 export class ReachVoyageDirector {
   private readonly arrivalSystem = new StarSystem('reach-arrival', 'c0', 0, new Vector3(), SOLAR_SYSTEM, [], []);
   private stop = 0;
@@ -89,6 +95,7 @@ export class ReachVoyageDirector {
     source: CelestialBody; next: number; offset: Vector3; orientation: Quaternion; up: Vector3;
     orbitRate: number; radialSpeed: number; endRadius: number; duration: number; elapsed: number;
   } | null = null;
+  private readonly stops: readonly ReachStop[];
 
   get directing(): boolean { return this.stage === 'departure' || this.stage === 'flyby'; }
   get roundTrips(): number { return this.roundTripCount; }
@@ -101,10 +108,10 @@ export class ReachVoyageDirector {
   get countdown(): { phase: 'NEXT' | 'DEPART' | 'CRUISE'; destinationId: string; routeIndex: number; secondsLeft: number } {
     if (this.stage === 'departure') {
       const d = this.departure!;
-      return { phase: 'CRUISE', destinationId: REACH_ITINERARY[d.next].id,
+      return { phase: 'CRUISE', destinationId: this.stops[d.next].id,
         routeIndex: d.next, secondsLeft: d.duration - d.elapsed };
     }
-    const destinationId = REACH_ITINERARY[this.stop].id;
+    const destinationId = this.stops[this.stop].id;
     if (this.stage === 'flyby') return { phase: 'DEPART', destinationId,
       routeIndex: this.stop, secondsLeft: this.flyby!.duration - this.flyby!.elapsed };
     if (this.stage === 'observe') return { phase: 'DEPART', destinationId,
@@ -118,20 +125,22 @@ export class ReachVoyageDirector {
     private readonly universe: Universe, private readonly camera: CameraController, private readonly time: TimeSystem,
     private readonly timing: ReachTiming,
     saved?: ReachJourneyState | null, private readonly onPhaseChange?: () => void,
+    private readonly route: ReachRoute = REACH_PRODUCTION_ROUTE,
   ) {
-    for (const stop of REACH_ITINERARY) this.body(stop.id);
+    this.stops = route.stops;
+    for (const stop of this.stops) this.destination(stop);
     if (saved) { this.restore(saved); return; }
     const earth = this.body('earth');
     const sunward = new Vector3().subVectors(universe.star.position, earth.position).normalize();
     const view = sunward.addScaledVector(earth.pole, 0.25).normalize();
     camera.placeAt(earth, view.multiplyScalar(earth.radius * 4));
     camera.autoOrbit = OBSERVATION_ORBIT;
-    this.observeDuration = this.timing.observe(REACH_ITINERARY[0]);
+    this.observeDuration = this.timing.observe(this.stops[0]);
     this.observeLeft = this.observeDuration;
   }
 
   capture(): ReachJourneyState {
-    const current = REACH_ITINERARY[this.stop];
+    const current = this.stops[this.stop];
     const c = this.camera;
     if (!c.reference || !c.target) throw new Error('Reach camera has no reference or target');
     let phase: JourneyPhase;
@@ -144,7 +153,7 @@ export class ReachVoyageDirector {
         up: vec(f.up), elapsed: f.elapsed, duration: f.duration };
     } else if (this.stage === 'departure') {
       const d = this.departure!;
-      phase = { kind: 'departure', sourceId: d.source.id, nextId: REACH_ITINERARY[d.next].id,
+      phase = { kind: 'departure', sourceId: d.source.id, nextId: this.stops[d.next].id,
         offset: vec(d.offset), orientation: quat(d.orientation), up: vec(d.up),
         orbitRate: d.orbitRate, radialSpeed: d.radialSpeed, endRadius: d.endRadius,
         elapsed: d.elapsed, duration: d.duration };
@@ -158,7 +167,7 @@ export class ReachVoyageDirector {
         gentleStart: ap.gentleStart ?? false };
     }
     return {
-      schema: 1, itinerary: { id: REACH_ITINERARY_ID, version: REACH_ITINERARY_VERSION },
+      schema: 1, itinerary: { id: this.route.id, version: this.route.version },
       destinationId: current.id, routeIndex: this.stop, phase,
       simulation: { jd: this.time.jd, rate: this.time.rate },
       frame: { starId: this.universe.current.starId },
@@ -170,13 +179,13 @@ export class ReachVoyageDirector {
   }
 
   private restore(saved: ReachJourneyState): void {
-    this.stop = REACH_ITINERARY.findIndex((stop) => stop.id === saved.destinationId);
+    this.stop = this.stops.findIndex((stop) => stop.id === saved.destinationId);
     this.completedKm = saved.odometer?.completedKm ?? 0;
     this.roundTripCount = saved.odometer?.roundTrips ?? 0;
     this.leg = saved.odometer?.leg ? { ...saved.odometer.leg } : null;
     if (!saved.odometer && (saved.phase.kind === 'departure' || saved.phase.kind === 'cruise')) {
       const fromId = saved.phase.kind === 'departure' ? saved.destinationId
-        : REACH_ITINERARY[(this.stop - 1 + REACH_ITINERARY.length) % REACH_ITINERARY.length].id;
+        : this.stops[(this.stop - 1 + this.stops.length) % this.stops.length].id;
       const toId = saved.phase.kind === 'departure' ? saved.phase.nextId : saved.destinationId;
       this.leg = this.makeLeg(fromId, toId);
     }
@@ -210,7 +219,7 @@ export class ReachVoyageDirector {
         elapsed: phase.elapsed, duration: phase.duration };
     } else if (phase.kind === 'departure') {
       this.departure = { source: this.body(phase.sourceId),
-        next: REACH_ITINERARY.findIndex((stop) => stop.id === phase.nextId),
+        next: this.stops.findIndex((stop) => stop.id === phase.nextId),
         offset: new Vector3().fromArray(phase.offset),
         orientation: new Quaternion().fromArray(phase.orientation), up: new Vector3().fromArray(phase.up),
         orbitRate: phase.orbitRate, radialSpeed: phase.radialSpeed, endRadius: phase.endRadius,
@@ -224,11 +233,11 @@ export class ReachVoyageDirector {
     if (this.stage === 'flyby') { this.updateFlyby(dt); return; }
     if (this.stage === 'cruise') {
       if (this.camera.autopilot) return;
-      if (this.leg && this.leg.toId === REACH_ITINERARY[this.stop].id) {
+      if (this.leg && this.leg.toId === this.stops[this.stop].id) {
         this.completedKm += this.leg.distanceKm;
         this.leg = null;
       }
-      const stop = REACH_ITINERARY[this.stop];
+      const stop = this.stops[this.stop];
       if (stop.profile === 'moon') {
         const body = this.body(stop.id);
         this.flyby = {
@@ -247,8 +256,9 @@ export class ReachVoyageDirector {
       this.onPhaseChange?.();
       return;
     }
-    this.observeLeft -= dt;
-    if (this.observeLeft <= 0) this.beginDeparture(0, this.camera.autoOrbit);
+    this.observeLeft = Math.max(0, this.observeLeft - dt);
+    if (this.observeLeft <= 0 && (this.route.repeat || this.stop < this.stops.length - 1))
+      this.beginDeparture(0, this.camera.autoOrbit);
   }
 
   private updateFlyby(dt: number): void {
@@ -265,18 +275,19 @@ export class ReachVoyageDirector {
   }
 
   private beginDeparture(radialSpeed: number, orbitRate: number): void {
-    const source = this.body(REACH_ITINERARY[this.stop].id);
-    const next = (this.stop + 1) % REACH_ITINERARY.length;
-    this.leg = this.makeLeg(source.id, REACH_ITINERARY[next].id);
+    const source = this.destination(this.stops[this.stop]);
+    const next = (this.stop + 1) % this.stops.length;
+    this.leg = this.makeLeg(this.stops[this.stop].id, this.stops[next].id);
     const offset = new Vector3().subVectors(this.camera.position, source.position);
-    const isMoon = REACH_ITINERARY[this.stop].profile === 'moon';
-    const duration = this.timing.departure(REACH_ITINERARY[this.stop]);
+    const isMoon = this.stops[this.stop].profile === 'moon';
+    const duration = this.timing.departure(this.stops[this.stop]);
     this.departure = {
       source, next, offset,
       orientation: this.camera.quaternion.clone(),
       up: new Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).normalize(),
       orbitRate, radialSpeed,
-      endRadius: Math.max(offset.length() * (isMoon ? 4 : 6), source.radius * 20),
+      endRadius: Math.max(offset.length() * (isMoon ? 4 : 6),
+        source.radius * (this.stops[next].profile === 'star' ? 300 : 20)),
       duration, elapsed: 0,
     };
     this.camera.autoOrbit = 0;
@@ -298,28 +309,43 @@ export class ReachVoyageDirector {
     this.camera.position.copy(d.source.position).add(offset);
 
     const orbitOrientation = d.orientation.clone().premultiply(orbit);
-    const destination = this.body(REACH_ITINERARY[d.next].id);
-    const direction = new Vector3().subVectors(destination.position, this.camera.position);
+    const nextStop = this.stops[d.next];
+    const nextSystem = destinationSystem(nextStop) === this.universe.current.starId
+      ? this.universe.current : this.universe.system(destinationSystem(nextStop));
+    if (nextSystem !== this.universe.current) nextSystem.update(this.time.jd, this.time.t);
+    const direction = nextSystem.origin.clone().add(this.destination(nextStop).position)
+      .sub(this.universe.current.origin).sub(this.camera.position);
     const up = new Vector3(0, 1, 0).applyQuaternion(orbitOrientation);
     const facing = new Quaternion().setFromRotationMatrix(new Matrix4().lookAt(new Vector3(), direction, up));
-    this.camera.quaternion.copy(orbitOrientation).slerp(facing, 0.3 * smoothstep((u - 0.2) / 0.8));
+    this.camera.quaternion.copy(orbitOrientation).slerp(facing,
+      nextStop.profile === 'star' ? smoothstep((u - 0.4) / 0.6)
+        : 0.3 * smoothstep((u - 0.2) / 0.8));
 
     if (u < 1) return;
     this.departure = null;
     this.stop = d.next;
-    const stop = REACH_ITINERARY[this.stop];
+    const stop = this.stops[this.stop];
+    if (destinationSystem(stop) !== this.universe.current.starId) {
+      const delta = this.universe.switchTo(destinationSystem(stop), this.time.jd, this.time.t);
+      const shiftStarted = reachArrivalTraceEnabled() ? performance.now() : 0;
+      this.camera.shiftFrame(delta, this.universe.star);
+      if (shiftStarted) console.info('[reach-arrival-event]', JSON.stringify({ name: 'camera-frame-shift',
+        atMs: Math.round(performance.now()), durationMs: Math.round((performance.now() - shiftStarted) * 100) / 100 }));
+    }
+    const destination = this.destination(stop);
     const fromDestination = new Vector3().subVectors(this.camera.position, destination.position).normalize();
     // Moon approach is on the outside of its parent orbit, with the planet behind the subject.
     const approach = stop.profile === 'moon' && destination.parent
       ? new Vector3().subVectors(destination.position, destination.parent.position).normalize()
       : fromDestination;
-    const distance = stop.profile === 'sun' ? destination.radius * 40
+    const distance = stop.profile === 'star' || stop.profile === 'sun' ? destination.radius * 40
       : stop.profile === 'probe' ? destination.radius * 4.5
       : stop.profile === 'moon' ? destination.radius * 5
       : Math.max(destination.radius * 3.6, (destination.data.rings?.outer ?? 0) * 2.2);
     const flightDuration = this.timing.travel(stop);
-    const arrival = this.sunlitArrivalDirection(stop, approach, fromDestination, distance, flightDuration);
-    this.camera.goToVantage(destination, arrival, distance, flightDuration, undefined, true);
+    const arrival = stop.profile === 'star' ? approach
+      : this.sunlitArrivalDirection(stop, approach, fromDestination, distance, flightDuration);
+    this.camera.goToVantage(destination, arrival, distance, flightDuration, undefined, stop.profile !== 'star');
     this.stage = 'cruise';
     this.onPhaseChange?.();
   }
@@ -402,8 +428,26 @@ export class ReachVoyageDirector {
     return body;
   }
 
+  private destination(stop: ReachStop): CelestialBody {
+    const ref = destinationRef(stop);
+    const systemId = ref.kind === 'star' ? ref.starId : ref.systemId;
+    const system = systemId === this.universe.current.starId
+      ? this.universe.current : this.universe.system(systemId);
+    const body = ref.kind === 'star' ? system.star : system.get(ref.bodyId);
+    if (!body) throw new Error(`Reach destination missing: ${stop.id}`);
+    return body;
+  }
+
   private makeLeg(fromId: string, toId: string): ReachDistanceLeg {
+    const from = this.stops.find((stop) => stop.id === fromId)!;
+    const to = this.stops.find((stop) => stop.id === toId)!;
+    const sourceSystem = destinationSystem(from) === this.universe.current.starId
+      ? this.universe.current : this.universe.system(destinationSystem(from));
+    const targetSystem = destinationSystem(to) === this.universe.current.starId
+      ? this.universe.current : this.universe.system(destinationSystem(to));
+    if (targetSystem !== this.universe.current) targetSystem.update(this.time.jd, this.time.t);
     return { fromId, toId, departureJd: this.time.jd,
-      distanceKm: geometricLegKm(this.universe.current.origin, this.body(fromId).position, this.body(toId).position) };
+      distanceKm: geometricLegKm(sourceSystem.origin, this.destination(from).position,
+        targetSystem.origin.clone().sub(sourceSystem.origin).add(this.destination(to).position)) };
   }
 }

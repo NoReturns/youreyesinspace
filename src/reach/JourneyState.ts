@@ -1,8 +1,10 @@
 import type { ReachOdometerState } from './ReachOdometer';
+import { destinationRef, destinationSystem, type ReachRoute, type ReachStop } from './ReachDestinations';
 
 export const REACH_JOURNEY_KEY = 'the-reach:journey:v1';
 export const REACH_ITINERARY_ID = 'solar-system-41';
 export const REACH_ITINERARY_VERSION = 1;
+export const REACH_PROXIMA_PILOT_KEY = 'the-reach:journey:pilot-proxima:v4';
 
 export type Vec3 = [number, number, number];
 export type Quat = [number, number, number, number];
@@ -53,11 +55,12 @@ export interface ReachJourneyStore {
   write(json: string): void;
 }
 
-export interface ReachRouteStop { id: string; profile: string }
+export interface ReachRouteStop extends ReachStop {}
 
 export class LocalStorageReachJourneyStore implements ReachJourneyStore {
-  read(): string | null { return window.localStorage.getItem(REACH_JOURNEY_KEY); }
-  write(json: string): void { window.localStorage.setItem(REACH_JOURNEY_KEY, json); }
+  constructor(private readonly key = REACH_JOURNEY_KEY) {}
+  read(): string | null { return window.localStorage.getItem(this.key); }
+  write(json: string): void { window.localStorage.setItem(this.key, json); }
 }
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -72,30 +75,38 @@ const unit = (v: unknown): v is Vec3 => vec3(v)
 const duration = (v: unknown): v is number => finite(v) && v > 0 && v <= 1000;
 const progress = (v: unknown, length: number): v is number => finite(v) && v >= 0 && v <= length;
 
-export function parseReachJourney(raw: string | null, route: readonly ReachRouteStop[], hasBody: (id: string) => boolean): ReachJourneyState | null {
+export function parseReachJourney(raw: string | null, routeInput: readonly ReachRouteStop[] | ReachRoute,
+  hasBody: (id: string) => boolean): ReachJourneyState | null {
   if (raw === null) return null;
+  const route = Array.isArray(routeInput) ? routeInput as readonly ReachRouteStop[] : (routeInput as ReachRoute).stops;
+  const routeId = Array.isArray(routeInput) ? REACH_ITINERARY_ID : (routeInput as ReachRoute).id;
+  const routeVersion = Array.isArray(routeInput) ? REACH_ITINERARY_VERSION : (routeInput as ReachRoute).version;
   let state: unknown;
   try { state = JSON.parse(raw); } catch { return null; }
   const destination = record(state) && typeof state.destinationId === 'string'
     ? route.find((stop) => stop.id === state.destinationId) : undefined;
   if (!record(state) || state.schema !== 1 || !record(state.itinerary)
-    || state.itinerary.id !== REACH_ITINERARY_ID || state.itinerary.version !== REACH_ITINERARY_VERSION
+    || state.itinerary.id !== routeId || state.itinerary.version !== routeVersion
     || typeof state.destinationId !== 'string' || !destination
     || !hasBody(state.destinationId) || !Number.isInteger(state.routeIndex) || !finite(state.routeIndex)
     || state.routeIndex < 0 || state.routeIndex >= route.length
     || !record(state.simulation) || !finite(state.simulation.jd)
     || state.simulation.jd < 2_000_000 || state.simulation.jd > 3_000_000
     || !finite(state.simulation.rate) || state.simulation.rate <= 0 || state.simulation.rate > 1_000_000
-    || !record(state.frame) || state.frame.starId !== 'c0'
+    || !record(state.frame) || typeof state.frame.starId !== 'string'
     || !record(state.camera) || !vec3(state.camera.position) || !quat(state.camera.orientation)
     || typeof state.camera.referenceId !== 'string' || !hasBody(state.camera.referenceId)
     || typeof state.camera.targetId !== 'string' || !hasBody(state.camera.targetId)
-    || state.camera.referenceId !== state.destinationId || state.camera.targetId !== state.destinationId
+    || state.camera.referenceId !== state.camera.targetId
     || !finite(state.camera.autoOrbit) || Math.abs(state.camera.autoOrbit) > 1
     || !record(state.phase) || !duration(state.phase.duration)
     || !progress(state.phase.elapsed, state.phase.duration)) return null;
 
   const phase = state.phase;
+  const currentRef = destinationRef(destination);
+  const expectedBodyId = currentRef.kind === 'star' ? `s${currentRef.starId.slice(1)}-star` : currentRef.bodyId;
+  const expectedFrame = destinationSystem(destination);
+  if (state.frame.starId !== expectedFrame || state.camera.referenceId !== expectedBodyId) return null;
   if (phase.kind !== 'observe' && state.camera.autoOrbit !== 0) return null;
   if (phase.kind === 'observe') {
     if (destination.profile === 'moon' || state.camera.flight !== null) return null;
@@ -104,7 +115,7 @@ export function parseReachJourney(raw: string | null, route: readonly ReachRoute
       || !nonzeroVec(phase.offset) || !quat(phase.orientation)
       || !unit(phase.up) || state.camera.flight !== null) return null;
   } else if (phase.kind === 'departure') {
-    if (phase.sourceId !== state.destinationId || typeof phase.nextId !== 'string'
+    if (phase.sourceId !== expectedBodyId || typeof phase.nextId !== 'string'
       || !route.some((stop) => stop.id === phase.nextId) || !hasBody(phase.nextId)
       || !nonzeroVec(phase.offset) || !quat(phase.orientation) || !unit(phase.up)
       || !finite(phase.orbitRate) || Math.abs(phase.orbitRate) > 1
@@ -112,7 +123,7 @@ export function parseReachJourney(raw: string | null, route: readonly ReachRoute
       || state.camera.flight !== null) return null;
   } else if (phase.kind === 'cruise') {
     const flight = state.camera.flight;
-    if (!record(flight) || flight.targetId !== state.destinationId
+    if (!record(flight) || flight.targetId !== expectedBodyId
       || !duration(flight.duration) || !progress(flight.elapsed, flight.duration)
       || flight.duration !== phase.duration || flight.elapsed !== phase.elapsed
       || !nonzeroVec(flight.startOffset) || !unit(flight.endDirection)
@@ -143,7 +154,8 @@ export function parseReachJourney(raw: string | null, route: readonly ReachRoute
   return state as unknown as ReachJourneyState;
 }
 
-export function loadReachJourney(store: ReachJourneyStore, route: readonly ReachRouteStop[], hasBody: (id: string) => boolean): ReachJourneyState | null {
+export function loadReachJourney(store: ReachJourneyStore, route: readonly ReachRouteStop[] | ReachRoute,
+  hasBody: (id: string) => boolean): ReachJourneyState | null {
   try { return parseReachJourney(store.read(), route, hasBody); } catch { return null; }
 }
 

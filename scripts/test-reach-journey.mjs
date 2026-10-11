@@ -416,12 +416,14 @@ globalThis.window = { addEventListener() {} };
 const leader = new ReachPanoramaSync(primary);
 const follower = new ReachPanoramaSync(right);
 assert.equal(follower.latest, null);
-const sharedFrame = { jd: 2460000, rate: 1, paused: false, position: [1, 2, 3],
+const sharedFrame = { jd: 2460000, rate: 1, paused: false, starId: 'c0', position: [1, 2, 3],
   orientation: [0, 0, 0, 1], referenceId: 'earth', targetId: 'earth',
   destinationId: 'earth', phase: 'DEPART', secondsLeft: 8 };
 leader.publish(sharedFrame);
 assert.equal(follower.latest?.sequence, 0);
 assert.deepEqual(follower.latest?.position, [1, 2, 3]);
+leader.publish({ ...sharedFrame, starId: 'c64548', referenceId: 's64548-star', targetId: 's64548-star' });
+assert.equal(follower.latest?.starId, 'c64548', 'followers receive the primary system frame');
 follower.publish({ ...sharedFrame, destinationId: 'mars' });
 assert.equal(follower.latest?.destinationId, 'earth', 'follower cannot publish another journey');
 globalThis.BroadcastChannel = previousBroadcastChannel;
