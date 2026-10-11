@@ -27,6 +27,8 @@ export interface ReachFlightState {
   startOrientation: Quat;
   up: Vec3 | null;
   gentleStart: boolean;
+  /** Absent in checkpoints written before cinematic cruise viewing was introduced. */
+  cinematicCruise?: boolean;
 }
 
 export interface ReachJourneyState {
@@ -129,7 +131,8 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
       || !nonzeroVec(flight.startOffset) || !unit(flight.endDirection)
       || !finite(flight.endDistance) || flight.endDistance <= 0 || flight.endDistance >= 1e15
       || !quat(flight.startOrientation) || (flight.up !== null && !unit(flight.up))
-      || typeof flight.gentleStart !== 'boolean') return null;
+      || typeof flight.gentleStart !== 'boolean'
+      || (flight.cinematicCruise !== undefined && typeof flight.cinematicCruise !== 'boolean')) return null;
   } else return null;
 
   if (state.odometer !== undefined) {

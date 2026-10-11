@@ -236,10 +236,10 @@ const previousWindow = globalThis.window;
 const previousDocument = globalThis.document;
 globalThis.window = {};
 assert.deepEqual(readCountdownContract(true), { enabled: true, primaryDisplay: true, position: 'auto' },
-  'development pilot supplies the missing countdown contract');
-assert.equal(readCountdownContract(), null, 'production countdown still requires host configuration');
-assert.deepEqual(readOdometerContract(true), { position: 'auto' }, 'browser pilot displays existing HUD');
-assert.equal(readOdometerContract(), null, 'production still requires host contract');
+  'primary Reach page supplies the missing countdown contract');
+assert.equal(readCountdownContract(), null, 'an optional fallback still requires the primary Reach caller');
+assert.deepEqual(readOdometerContract(true), { position: 'auto' }, 'primary Reach page displays existing HUD');
+assert.equal(readOdometerContract(), null, 'an optional fallback still requires the primary Reach caller');
 globalThis.window.__reachCountdown = { enabled: true, primaryDisplay: false, position: 'auto' };
 assert.equal(readCountdownContract(true), null, 'secondary display never gets a pilot countdown');
 assert.equal(readOdometerContract(true), null, 'secondary display never gets an odometer');

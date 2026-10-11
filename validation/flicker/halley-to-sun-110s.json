@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "itinerary": {
+    "id": "solar-system-41",
+    "version": 1
+  },
+  "destinationId": "sun",
+  "routeIndex": 38,
+  "phase": {
+    "kind": "cruise",
+    "elapsed": 110.09999999999802,
+    "duration": 570
+  },
+  "simulation": {
+    "jd": 2461324.653350613,
+    "rate": 1
+  },
+  "frame": {
+    "starId": "c0"
+  },
+  "odometer": {
+    "completedKm": 209725884036.53055,
+    "roundTrips": 0,
+    "leg": {
+      "fromId": "halley",
+      "toId": "sun",
+      "departureJd": 2461324.651959137,
+      "distanceKm": 5227009622.302731
+    }
+  },
+  "camera": {
+    "position": [
+      -1949563380.994021,
+      -995188451.3143165,
+      -2769508631.680923
+    ],
+    "orientation": [
+      -0.6159059884607914,
+      0.5318347159134652,
+      0.5199231951649788,
+      0.25979129980973237
+    ],
+    "referenceId": "sun",
+    "targetId": "sun",
+    "autoOrbit": 0,
+    "flight": {
+      "targetId": "sun",
+      "elapsed": 110.09999999999802,
+      "duration": 570,
+      "startOffset": [
+        -2886739948.590367,
+        -1473586489.5657003,
+        -4100841902.8484435
+      ],
+      "endDirection": [
+        -0.5522737069991687,
+        -0.2819176952789743,
+        -0.7845483832409497
+      ],
+      "endDistance": 27828000,
+      "startOrientation": [
+        -0.5908985577444823,
+        0.5154533773585168,
+        0.5480169765994137,
+        0.29124577865445433
+      ],
+      "up": null,
+      "gentleStart": true,
+      "cinematicCruise": true
+    }
+  }
+}

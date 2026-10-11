@@ -38,9 +38,10 @@ export function resolveOdometerPosition(countdown: CountdownPosition | 'auto', r
   return row[routeIndex % row.length];
 }
 
-export function readOdometerContract(developmentPilot = false): { position: CountdownPosition | 'auto' } | null {
+export function readOdometerContract(defaultVisible = false): { position: CountdownPosition | 'auto' } | null {
   const value = (window as Window & { __reachCountdown?: unknown }).__reachCountdown;
-  if (!value || typeof value !== 'object') return developmentPilot ? { position: 'auto' } : null;
+  if (value === undefined) return defaultVisible ? { position: 'auto' } : null;
+  if (!value || typeof value !== 'object') return null;
   const config = value as { primaryDisplay?: unknown; position?: unknown };
   if (config.primaryDisplay !== true || (config.position !== 'auto'
     && !COUNTDOWN_POSITIONS.includes(config.position as CountdownPosition))) return null;

@@ -164,7 +164,7 @@ export class ReachVoyageDirector {
       flight = { targetId: ap.target.id, elapsed: ap.t, duration: ap.duration,
         startOffset: vec(ap.r0), endDirection: vec(ap.dir1), endDistance: ap.dist1,
         startOrientation: quat(ap.q0), up: ap.up1 ? vec(ap.up1) : null,
-        gentleStart: ap.gentleStart ?? false };
+        gentleStart: ap.gentleStart ?? false, cinematicCruise: ap.cinematicCruise ?? false };
     }
     return {
       schema: 1, itinerary: { id: this.route.id, version: this.route.version },
@@ -206,6 +206,7 @@ export class ReachVoyageDirector {
       q0: new Quaternion().fromArray(flight.startOrientation),
       up1: flight.up ? new Vector3().fromArray(flight.up) : undefined,
       gentleStart: flight.gentleStart,
+      cinematicCruise: flight.cinematicCruise ?? false,
     } : null;
 
     const phase = saved.phase;
@@ -345,7 +346,7 @@ export class ReachVoyageDirector {
     const flightDuration = this.timing.travel(stop);
     const arrival = stop.profile === 'star' ? approach
       : this.sunlitArrivalDirection(stop, approach, fromDestination, distance, flightDuration);
-    this.camera.goToVantage(destination, arrival, distance, flightDuration, undefined, stop.profile !== 'star');
+    this.camera.goToVantage(destination, arrival, distance, flightDuration, undefined, stop.profile !== 'star', true);
     this.stage = 'cruise';
     this.onPhaseChange?.();
   }

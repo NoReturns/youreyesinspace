@@ -289,6 +289,14 @@ const pausedCountdown = pausedRun.director.countdown;
 pausedRun.director.update(5, true);
 assert.deepEqual(pausedRun.director.countdown, pausedCountdown, 'pause retains the phase countdown');
 const previousWindow = globalThis.window;
+globalThis.window = {};
+assert.deepEqual(readCountdownContract(true), { enabled: true, primaryDisplay: true, position: 'auto' },
+  'primary voyage displays the destination countdown without host injection');
+assert.deepEqual(readOdometerContract(true), { position: 'auto' },
+  'primary voyage displays the odometer without host injection');
+globalThis.window.__reachCountdown = null;
+assert.equal(readCountdownContract(true), null, 'invalid explicit host configuration does not enable countdown');
+assert.equal(readOdometerContract(true), null, 'invalid explicit host configuration does not enable odometer');
 globalThis.window = { __reachCountdown: { enabled: true, primaryDisplay: true, position: 'auto' } };
 assert.ok(readCountdownContract());
 globalThis.window.__reachCountdown.primaryDisplay = false;
@@ -296,6 +304,7 @@ assert.equal(readCountdownContract(), null);
 globalThis.window.__reachCountdown.primaryDisplay = true;
 globalThis.window.__reachCountdown.enabled = false;
 assert.equal(readCountdownContract(), null);
+assert.equal(readCountdownContract(true), null, 'explicit host disable overrides the default');
 assert.ok(readOdometerContract(), 'odometer remains visible if countdown is disabled');
 globalThis.window.__reachCountdown.primaryDisplay = false;
 assert.equal(readOdometerContract(), null, 'secondary monitors have no odometer');
@@ -417,11 +426,12 @@ const leader = new ReachPanoramaSync(primary);
 const follower = new ReachPanoramaSync(right);
 assert.equal(follower.latest, null);
 const sharedFrame = { jd: 2460000, rate: 1, paused: false, starId: 'c0', position: [1, 2, 3],
-  orientation: [0, 0, 0, 1], referenceId: 'earth', targetId: 'earth',
+  orientation: [0, Math.sin(Math.PI / 36), 0, Math.cos(Math.PI / 36)], referenceId: 'earth', targetId: 'earth',
   destinationId: 'earth', phase: 'DEPART', secondsLeft: 8 };
 leader.publish(sharedFrame);
 assert.equal(follower.latest?.sequence, 0);
 assert.deepEqual(follower.latest?.position, [1, 2, 3]);
+assert.deepEqual(follower.latest?.orientation, sharedFrame.orientation, 'follower receives the changing camera orientation');
 leader.publish({ ...sharedFrame, starId: 'c64548', referenceId: 's64548-star', targetId: 's64548-star' });
 assert.equal(follower.latest?.starId, 'c64548', 'followers receive the primary system frame');
 follower.publish({ ...sharedFrame, destinationId: 'mars' });

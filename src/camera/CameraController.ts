@@ -32,6 +32,8 @@ interface Autopilot {
   up1?: Vector3;
   /** Reach departure: ease into the usual flight, matching it by one-quarter duration. */
   gentleStart?: boolean;
+  /** Reach long cruise: a small, deterministic viewing drift around the flight aim. */
+  cinematicCruise?: boolean;
 }
 
 const _v = new Vector3();
@@ -195,7 +197,7 @@ export class CameraController {
    * `durationS` overrides the distance-based flight time; `up1` fixes the roll at arrival.
    * `gentleStart` delays early progress, then rejoins the usual flight at one-quarter duration.
    */
-  goToVantage(body: CelestialBody, dir1: Vector3, dist1: number, durationS?: number, up1?: Vector3, gentleStart = false): void {
+  goToVantage(body: CelestialBody, dir1: Vector3, dist1: number, durationS?: number, up1?: Vector3, gentleStart = false, cinematicCruise = false): void {
     const r0 = _v.copy(this.position).sub(body.position);
     const ratio = Math.max(r0.length(), 1) / dist1;
     const duration = durationS ?? 2.2 + Math.min(4.5, Math.abs(Math.log10(ratio)) * 0.9);
@@ -204,6 +206,7 @@ export class CameraController {
       r0: r0.clone(), dir1: dir1.clone().normalize(), dist1, q0: this.quaternion.clone(),
       up1: up1?.clone().normalize(),
       gentleStart,
+      cinematicCruise,
     };
     this.autoOrbit = 0;
     this.setReference(body);
@@ -346,6 +349,15 @@ export class CameraController {
         _m.lookAt(new Vector3(), _v.copy(tgtPos).sub(this.position), ap.up1 ? _v2.copy(ap.up1) : _v2.set(0, 1, 0).applyQuaternion(ap.q0));
         _q.setFromRotationMatrix(_m);
         this.quaternion.copy(ap.q0).slerp(_q, smoothstep(Math.min(1, s * 1.6)));
+        if (ap.cinematicCruise && ap.duration >= 120) {
+          const elapsed = Math.min(ap.t, ap.duration);
+          const envelope = smoothstep(Math.min(1, elapsed / 24))
+            * smoothstep(Math.min(1, (ap.duration - elapsed) / 45));
+          const yaw = envelope * 0.1 * Math.sin(elapsed * Math.PI * 2 / 260);
+          const pitch = envelope * 0.04 * Math.sin(elapsed * Math.PI * 2 / 330 + 0.8);
+          this.quaternion.multiply(_q2.setFromAxisAngle(Y, yaw));
+          this.quaternion.multiply(_q2.setFromAxisAngle(X, pitch));
+        }
       } else {
         _m.lookAt(new Vector3(), _v.copy(tgtPos).sub(this.position), _v2.set(0, 1, 0).applyQuaternion(ap.q0));
         _q.setFromRotationMatrix(_m);

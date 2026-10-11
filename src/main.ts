@@ -28,7 +28,7 @@ import { destinationRef, reachPilotStarAppearance, REACH_PROXIMA_PILOT } from '.
 import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
 import { ReachOdometerOverlay, readOdometerContract } from './reach/ReachOdometer';
 import { ReachPanoramaSync, readReachPanorama } from './reach/ReachPanorama';
-import { LocalStorageReachJourneyStore, REACH_PROXIMA_PILOT_KEY, loadReachJourney, saveReachJourney, type ReachJourneyStore } from './reach/JourneyState';
+import { LocalStorageReachJourneyStore, REACH_PROXIMA_PILOT_KEY, loadReachJourney, saveReachJourney, type ReachJourneyState, type ReachJourneyStore } from './reach/JourneyState';
 import { ReachTiming } from './reach/ReachTiming';
 import { ReachArrivalTrace } from './reach/ReachArrivalTrace';
 import { suppressProximaPlanetMeshes } from './reach/ReachPlanetMeshIsolation';
@@ -51,6 +51,8 @@ const TOUR_HOP_S = 1.6;
 /** auto-orbit speed (rad/s) of the opening backdrop */
 const BACKDROP_ORBIT = 0.03;
 const REACH_MODE = new URLSearchParams(window.location.search).get('reach') === '1';
+const REACH_FLICKER = import.meta.env.DEV && REACH_MODE
+  && new URLSearchParams(window.location.search).get('reachFlicker') === '1';
 const REACH_PILOT = import.meta.env.DEV && REACH_MODE
   && new URLSearchParams(window.location.search).get('reachPilot') === 'proxima';
 const REACH_TRACE = REACH_PILOT && new URLSearchParams(window.location.search).get('reachTrace') === '1';
@@ -88,7 +90,7 @@ class App implements UIHost {
   private readonly panorama = REACH_MODE ? readReachPanorama() : null;
   private readonly panoramaSync = this.panorama ? new ReachPanoramaSync(this.panorama) : null;
   private lastPanoramaSequence = -1;
-  private readonly reachStore: ReachJourneyStore | null = REACH_MODE && this.panorama?.isPrimaryDisplay !== false
+  private readonly reachStore: ReachJourneyStore | null = REACH_MODE && !REACH_FLICKER && this.panorama?.isPrimaryDisplay !== false
     ? new LocalStorageReachJourneyStore(REACH_PILOT ? REACH_PROXIMA_PILOT_KEY : undefined) : null;
   private lastReachSave = performance.now();
   private readonly arrivalTrace = REACH_TRACE
@@ -130,7 +132,7 @@ class App implements UIHost {
   private readonly maxPointPx: number;
   private readonly starSel: StarSelectionScreen = { name: '', dir: new Vector3() };
 
-  constructor(catalog: StarCatalog) {
+  constructor(catalog: StarCatalog, diagnosticJourney: ReachJourneyState | null = null) {
     if (this.arrivalTrace) {
       (window as Window & { __reachArrivalReport?: () => string }).__reachArrivalReport =
         () => this.arrivalTrace!.report();
@@ -149,7 +151,7 @@ class App implements UIHost {
     this.maxPointPx = Math.max(32, Math.min(256, (range?.[1] ?? 64) / this.engine.pixelRatio));
 
     this.universe = new Universe(catalog);
-    const savedJourney = this.reachStore && !REACH_TRACE_FRESH
+    const savedJourney = diagnosticJourney ?? (this.reachStore && !REACH_TRACE_FRESH
       ? loadReachJourney(this.reachStore, REACH_ROUTE, (id) => {
         const stop = REACH_ROUTE.stops.find((candidate) => candidate.id === id);
         if (stop) {
@@ -159,7 +161,7 @@ class App implements UIHost {
         }
         return !!this.universe.get(id) || (REACH_PILOT && !!this.universe.system('c64548').get(id));
       })
-      : null;
+      : null);
     if (savedJourney) {
       this.time.setRate(savedJourney.simulation.rate);
       this.time.jd = savedJourney.simulation.jd;
@@ -223,10 +225,9 @@ class App implements UIHost {
     } else if (REACH_MODE) {
       this.reach = new ReachVoyageDirector(this.universe, this.camera, this.time,
         new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach(), REACH_ROUTE);
-      const pilotHud = REACH_PILOT && this.panorama?.isPrimaryDisplay !== false;
-      const countdown = readCountdownContract(pilotHud);
+      const countdown = readCountdownContract(true);
       this.reachCountdown = countdown ? new ReachCountdownOverlay(this.reach, countdown.position) : null;
-      const odometer = readOdometerContract(pilotHud);
+      const odometer = readOdometerContract(true);
       this.reachOdometer = odometer ? new ReachOdometerOverlay(this.reach, odometer.position) : null;
       this.reachCountdown?.update(performance.now());
       this.reachOdometer?.update(performance.now());
@@ -274,7 +275,7 @@ class App implements UIHost {
       }),
       configurable: false,
     });
-    requestAnimationFrame(this.frame);
+    if (!REACH_FLICKER) requestAnimationFrame(this.frame);
     document.getElementById('loader')?.classList.add('done');
   }
 
@@ -1176,7 +1177,7 @@ class App implements UIHost {
 
   /* ---------------- Frame ---------------- */
   private frame = (now: number): void => {
-    requestAnimationFrame(this.frame);
+    if (!REACH_FLICKER) requestAnimationFrame(this.frame);
     const frameStarted = this.arrivalTrace ? performance.now() : 0;
     const intervalMs = now - this.last;
     const dt = Math.min(0.1, Math.max(0.0001, (now - this.last) / 1000));
@@ -1474,7 +1475,13 @@ async function boot(): Promise<void> {
     if (loaderText) loaderText.textContent = _('Yıldız kataloğu yükleniyor…');
     const catalog = await StarCatalog.load(import.meta.env.BASE_URL);
     if (loaderText) loaderText.textContent = _('Evren hazırlanıyor…');
-    const app = new App(catalog);
+    const diagnosticJourney = REACH_FLICKER
+      ? await fetch('/validation/flicker/halley-to-sun-110s.json').then((response) => {
+        if (!response.ok) throw new Error(`Diagnostic checkpoint HTTP ${response.status}`);
+        return response.json() as Promise<ReachJourneyState>;
+      }) : null;
+    const app = new App(catalog, diagnosticJourney);
+    if (REACH_FLICKER) void import('./dev/reach-flicker').then(({ runReachFlicker }) => runReachFlicker(app));
     // Keep the interactive debug handle out of passive Reach mode.
     if (!REACH_MODE) (window as unknown as { yeits: App }).yeits = app;
   } catch (err) {

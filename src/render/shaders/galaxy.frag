@@ -55,16 +55,22 @@ void main() {
     float x = sqrt((s + 0.03) / 0.5);
     b = exp(-3.67 * (x - 1.0)) / 16.0;
   } else if (vType > 3.5) {
-    // irregular: a few bright clumps
-    b = 0.0;
-    for (int k = 0; k < 4; k++) {
-      float fk = float(k) + vSeed * 0.013;
-      vec2 c = (vec2(hash1(fk * 1.7), hash1(fk * 3.1 + 5.0)) - 0.5) * 0.9;
-      float sg = 0.18 + 0.2 * hash1(fk * 7.3);
-      b += (0.5 + 0.5 * hash1(fk * 2.9)) * exp(-dot(p - c, p - c) / (2.0 * sg * sg));
+    // Irregulars need separated star-forming regions over a faint old population.
+    // Seed attributes are stored at 0.1 increments; snap interpolated fragment
+    // values back to that grid before the high-gain hash amplifies precision noise.
+    float stableSeed = floor(vSeed * 10.0 + 0.5) / 10.0;
+    b = 0.11 * exp(-2.4 * q);
+    float young = 0.0;
+    for (int k = 0; k < 6; k++) {
+      float fk = float(k) + stableSeed * 0.013;
+      vec2 c = (vec2(hash1(fk * 1.7), hash1(fk * 3.1 + 5.0)) - 0.5) * 1.15;
+      float sg = 0.09 + 0.13 * hash1(fk * 7.3);
+      float clump = (0.18 + 0.26 * hash1(fk * 2.9)) * exp(-dot(p - c, p - c) / (2.0 * sg * sg));
+      b += clump;
+      young += clump * hash1(fk * 5.7 + 2.0);
     }
-    b = min(b, 1.0) * 0.8;
-    col = mix(vColor, vec3(1.0, 0.7, 0.8), 0.25);
+    b = min(b, 0.85);
+    col = mix(vColor, vec3(1.0, 0.73, 0.78), 0.15 + 0.2 * clamp(young / max(b, 0.01), 0.0, 1.0));
   } else {
     // disc: exponential profile in the ellipsoidal radius
     float disc = exp(-3.2 * s);

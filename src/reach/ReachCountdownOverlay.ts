@@ -12,10 +12,11 @@ export function resolveCountdownPosition(position: CountdownPosition | 'auto', r
 
 interface CountdownContract { enabled: boolean; primaryDisplay: boolean; position: CountdownPosition | 'auto' }
 
-export function readCountdownContract(developmentPilot = false): CountdownContract | null {
+export function readCountdownContract(defaultVisible = false): CountdownContract | null {
   const value = (window as Window & { __reachCountdown?: unknown }).__reachCountdown;
-  if (!value || typeof value !== 'object')
-    return developmentPilot ? { enabled: true, primaryDisplay: true, position: 'auto' } : null;
+  if (value === undefined)
+    return defaultVisible ? { enabled: true, primaryDisplay: true, position: 'auto' } : null;
+  if (!value || typeof value !== 'object') return null;
   const config = value as Partial<CountdownContract>;
   if (config.enabled !== true || config.primaryDisplay !== true) return null;
   if (config.position !== 'auto' && !COUNTDOWN_POSITIONS.includes(config.position as CountdownPosition)) return null;
