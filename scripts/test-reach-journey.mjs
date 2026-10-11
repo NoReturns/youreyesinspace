@@ -12,6 +12,7 @@ const entry = `
   export { SOLAR_SYSTEM } from './src/data/solarSystem.ts';
   export { ReachTiming, REACH_TIMING, reachTravelKind } from './src/reach/ReachTiming.ts';
   export { COUNTDOWN_POSITIONS, ReachCountdownOverlay, formatCountdown, readCountdownContract, resolveCountdownPosition } from './src/reach/ReachCountdownOverlay.ts';
+  export { ReachOdometerOverlay, formatVoyageDistance, geometricLegKm, readOdometerContract, resolveOdometerPosition } from './src/reach/ReachOdometer.ts';
   export { ReachPanoramaSync, applyPanoramaView, localPanoramaFovRad, parseReachPanorama, readReachPanorama } from './src/reach/ReachPanorama.ts';
   export { loadReachJourney, parseReachJourney, saveReachJourney } from './src/reach/JourneyState.ts';
 `;
@@ -33,6 +34,7 @@ const {
   ReachVoyageDirector, REACH_ITINERARY, CameraController, StarSystem, TimeSystem, SOLAR_SYSTEM,
   ReachTiming, REACH_TIMING, reachTravelKind, loadReachJourney, parseReachJourney, saveReachJourney,
   COUNTDOWN_POSITIONS, ReachCountdownOverlay, formatCountdown, readCountdownContract, resolveCountdownPosition,
+  ReachOdometerOverlay, formatVoyageDistance, geometricLegKm, readOdometerContract, resolveOdometerPosition,
   ReachPanoramaSync, applyPanoramaView, localPanoramaFovRad, parseReachPanorama, readReachPanorama,
 } = module.exports;
 
@@ -83,6 +85,8 @@ function compare(run, resumed, label) {
   assert.ok(1 - Math.abs(resumed.camera.quaternion.dot(run.camera.quaternion)) < 1e-12, `${label}: restored orientation`);
   assert.equal(resumed.camera.reference?.id, run.camera.reference?.id, `${label}: camera reference`);
   assert.equal(resumed.camera.target?.id, run.camera.target?.id, `${label}: camera target`);
+  assert.equal(resumed.director.distanceTravelledKm, run.director.distanceTravelledKm, `${label}: odometer`);
+  assert.equal(resumed.director.roundTrips, run.director.roundTrips, `${label}: round trips`);
   const phase = run.director.capture().phase;
   const steps = Math.ceil((phase.duration - phase.elapsed) / 0.1) + 20;
   for (let i = 0; i < steps; i++) {
@@ -94,6 +98,8 @@ function compare(run, resumed, label) {
     const b = resumed.director.capture().phase;
     assert.equal(b.kind, a.kind, `${label}: continuing phase`);
     assert.ok(Math.abs((b.duration - b.elapsed) - (a.duration - a.elapsed)) < 1e-8, `${label}: remaining time`);
+    assert.ok(Math.abs(resumed.director.distanceTravelledKm - run.director.distanceTravelledKm) < 1e-3,
+      `${label}: continuing odometer at step ${i}`);
   }
 }
 
@@ -101,6 +107,8 @@ let changes = 0;
 const fresh = makeRun(null, { onPhaseChange: () => changes++ });
 assert.equal(fresh.director.capture().destinationId, 'earth');
 assert.equal(fresh.director.capture().phase.kind, 'observe');
+assert.equal(fresh.director.distanceTravelledKm, 0);
+assert.equal(fresh.director.roundTrips, 0);
 assert.equal(loadReachJourney({ read: () => null, write() {} }, route, (id) => !!fresh.universe.get(id)), null);
 console.log('PASS fresh Earth opening without save data');
 
@@ -205,12 +213,72 @@ for (let i = 0; i < 25_000 && (visited.size < 41 || travelled.size < 41); i++) {
 assert.equal(visited.size, 41);
 assert.equal(travelled.size, 41);
 assert.ok(venusWrap, 'Venus departure labels the next Earth destination');
+assert.ok(circuit.director.distanceTravelledKm > 0);
+assert.equal(circuit.director.roundTrips, 0, 'the 41-stop loop is not a round-trip');
+const beforeLoopReturn = circuit.director.distanceTravelledKm;
+const loopReturn = until(circuit, (s) => s.destinationId === 'earth' && s.phase.kind === 'observe');
+assert.ok(loopReturn.odometer.completedKm >= beforeLoopReturn, 'ordinary loop does not reset distance');
+assert.equal(loopReturn.odometer.roundTrips, 0, 'returning to Earth in the current loop is not a round-trip');
 console.log('PASS all 41 test-mode arrivals and travel legs');
+
+const earth = circuit.system.get('earth');
+const moon = circuit.system.get('moon');
+const origin = circuit.system.origin;
+assert.ok(Math.abs(geometricLegKm(origin, earth.position, moon.position)
+  - earth.position.distanceTo(moon.position)) < 1e-6);
+assert.equal(geometricLegKm(new Vector3(100, -20, 30), new Vector3(0, 0, 0), new Vector3(3, 4, 12)), 13);
+assert.equal(formatVoyageDistance(42.681 * 149_597_870.7), '42.681 AU');
+assert.equal(formatVoyageDistance(9.4607e12), '1 LY');
+assert.equal(formatVoyageDistance(9.4607e18), '1 MLY');
+assert.match(formatVoyageDistance(9.4607e12 - 1), /AU$/);
+assert.match(formatVoyageDistance(9.4607e18 - 1), /LY$/);
+assert.equal(formatVoyageDistance(0.00001 * 149_597_870.7), '0.00001 AU');
+assert.notEqual(formatVoyageDistance(1), '0.000 AU');
+console.log('PASS geometric Solar System separation and automatic AU, LY, MLY display');
+
+const measured = makeRun();
+const inFlight = until(measured, (s) => s.destinationId === 'moon'
+  && s.phase.kind === 'cruise' && s.phase.elapsed >= s.phase.duration / 2);
+const legKm = inFlight.odometer.leg.distanceKm;
+assert.ok(legKm > 0);
+assert.ok(Math.abs(measured.director.distanceTravelledKm
+  - legKm * inFlight.phase.elapsed / inFlight.phase.duration) < 1e-3);
+const beforePause = measured.director.distanceTravelledKm;
+measured.director.update(5, true);
+assert.equal(measured.director.distanceTravelledKm, beforePause);
+const restoredFlight = makeRun(loadReachJourney({ read: () => JSON.stringify(inFlight), write() {} }, route, hasBody));
+assert.equal(restoredFlight.director.distanceTravelledKm, beforePause);
+const arrived = until(restoredFlight, (s) => s.destinationId === 'moon' && s.phase.kind === 'flyby');
+assert.equal(arrived.odometer.leg, null);
+assert.ok(Math.abs(arrived.odometer.completedKm - legKm) < 1e-3);
+for (let i = 0; i < 20; i++) step(restoredFlight);
+assert.equal(restoredFlight.director.capture().odometer.completedKm, arrived.odometer.completedKm,
+  'arrival commits its leg only once');
+const restoredArrival = makeRun(loadReachJourney({ read: () => JSON.stringify(arrived), write() {} }, route, hasBody));
+assert.equal(restoredArrival.director.distanceTravelledKm, arrived.odometer.completedKm);
+assert.equal(restoredArrival.director.roundTrips, 0);
+const futureCompleted = structuredClone(arrived);
+futureCompleted.odometer.roundTrips = 2;
+const restoredFutureCount = makeRun(loadReachJourney({ read: () => JSON.stringify(futureCompleted), write() {} }, route, hasBody));
+assert.equal(restoredFutureCount.director.capture().odometer.roundTrips, 2,
+  'a future authoritative completion count survives a restart');
+assert.equal(parseReachJourney(JSON.stringify({ ...inFlight, odometer: {
+  ...inFlight.odometer, leg: { ...inFlight.odometer.leg, toId: 'mars' },
+} }), route, hasBody), null, 'mismatched leg cannot be restored');
+console.log('PASS mid-flight progress, pause, restart, exactly-once arrival, and leg validation');
 
 assert.equal(COUNTDOWN_POSITIONS.length, 6);
 for (let index = 0; index < route.length; index++) {
   assert.equal(resolveCountdownPosition('auto', index), COUNTDOWN_POSITIONS[index % 6]);
   for (const fixed of COUNTDOWN_POSITIONS) assert.equal(resolveCountdownPosition(fixed, index), fixed);
+  for (const setting of ['auto', ...COUNTDOWN_POSITIONS]) {
+    const countdown = resolveCountdownPosition(setting, index);
+    const odometer = resolveOdometerPosition(setting, index);
+    assert.ok(COUNTDOWN_POSITIONS.includes(odometer));
+    assert.notEqual(odometer, countdown);
+    assert.notEqual(odometer.startsWith('top'), countdown.startsWith('top'));
+    assert.notEqual(odometer, resolveOdometerPosition(setting, index + 1));
+  }
 }
 assert.equal(resolveCountdownPosition('auto', 0), COUNTDOWN_POSITIONS[0], 'wrapped Earth returns to first anchor');
 assert.equal(formatCountdown(221.1), '03:42');
@@ -228,6 +296,9 @@ assert.equal(readCountdownContract(), null);
 globalThis.window.__reachCountdown.primaryDisplay = true;
 globalThis.window.__reachCountdown.enabled = false;
 assert.equal(readCountdownContract(), null);
+assert.ok(readOdometerContract(), 'odometer remains visible if countdown is disabled');
+globalThis.window.__reachCountdown.primaryDisplay = false;
+assert.equal(readOdometerContract(), null, 'secondary monitors have no odometer');
 globalThis.window = previousWindow;
 
 let writes = 0;
@@ -243,6 +314,12 @@ assert.equal(writes, 1, 'no DOM writes between one-second updates');
 assert.equal(element.dataset.position, firstPosition);
 overlay.update(1000);
 assert.equal(writes, 1, 'no DOM write when visible text is unchanged');
+const odometerElement = { dataset: {}, setAttribute() {}, textContent: '' };
+globalThis.document = { createElement: () => odometerElement, body: { appendChild() {} } };
+const odometerOverlay = new ReachOdometerOverlay(circuit.director, 'auto');
+odometerOverlay.update(0);
+assert.match(odometerElement.textContent, /^Distance Travelled: .*\nRound-Trips: 0$/);
+assert.notEqual(odometerElement.dataset.position, resolveCountdownPosition('auto', circuit.director.countdown.routeIndex));
 globalThis.document = previousDocument;
 console.log('PASS six anchors, auto rotation, display gating, formatting, and DOM update throttle');
 
@@ -402,6 +479,7 @@ assert.equal(switchedToTest.director.capture().phase.duration, 8);
 console.log('PASS production-to-test switch retains observation, then uses 30-second travel and 8-second flyby');
 
 const legacy = structuredClone(savedFlight);
+delete legacy.odometer;
 legacy.phase.duration = 32;
 legacy.phase.elapsed = 16;
 legacy.camera.flight.duration = 32;
@@ -413,6 +491,8 @@ const resumedLegacy = makeRun(parsedLegacy, { mode: 'production', random: () => 
 assert.equal(legacyDraws, 0);
 assert.equal(resumedLegacy.director.capture().phase.duration, 32);
 assert.equal(resumedLegacy.director.capture().phase.elapsed, 16);
+assert.ok(resumedLegacy.director.distanceTravelledKm > 0, 'legacy mid-flight save receives one current leg');
+assert.equal(resumedLegacy.director.roundTrips, 0);
 assert.ok(resumedLegacy.camera.position.distanceTo(new Vector3().fromArray(legacy.camera.position)) < 1e-8);
 until(resumedLegacy, (s) => s.destinationId === 'moon' && s.phase.kind === 'flyby');
 assert.equal(resumedLegacy.director.capture().phase.duration, 21);

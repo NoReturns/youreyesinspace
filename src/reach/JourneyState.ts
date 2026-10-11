@@ -1,3 +1,5 @@
+import type { ReachOdometerState } from './ReachOdometer';
+
 export const REACH_JOURNEY_KEY = 'the-reach:journey:v1';
 export const REACH_ITINERARY_ID = 'solar-system-41';
 export const REACH_ITINERARY_VERSION = 1;
@@ -33,6 +35,8 @@ export interface ReachJourneyState {
   phase: JourneyPhase;
   simulation: { jd: number; rate: number };
   frame: { starId: string };
+  /** Absent in checkpoints written before the odometer was introduced. */
+  odometer?: ReachOdometerState;
   camera: {
     position: Vec3;
     orientation: Quat;
@@ -116,6 +120,25 @@ export function parseReachJourney(raw: string | null, route: readonly ReachRoute
       || !quat(flight.startOrientation) || (flight.up !== null && !unit(flight.up))
       || typeof flight.gentleStart !== 'boolean') return null;
   } else return null;
+
+  if (state.odometer !== undefined) {
+    const odometer = state.odometer;
+    if (!record(odometer) || !finite(odometer.completedKm) || odometer.completedKm < 0
+      || odometer.completedKm > 1e25 || !Number.isSafeInteger(odometer.roundTrips)
+      || (odometer.roundTrips as number) < 0 || (odometer.roundTrips as number) > 1_000_000
+      || (odometer.leg !== null && (!record(odometer.leg)
+        || typeof odometer.leg.fromId !== 'string' || !hasBody(odometer.leg.fromId)
+        || typeof odometer.leg.toId !== 'string' || !hasBody(odometer.leg.toId)
+        || !finite(odometer.leg.distanceKm) || odometer.leg.distanceKm < 0 || odometer.leg.distanceKm > 1e25
+        || !finite(odometer.leg.departureJd) || odometer.leg.departureJd < 2_000_000
+        || odometer.leg.departureJd > 3_000_000))) return null;
+    const expectedFrom = route[(route.findIndex((stop) => stop.id === state.destinationId) - 1 + route.length) % route.length].id;
+    if (phase.kind === 'departure' ? !record(odometer.leg) || odometer.leg.fromId !== state.destinationId
+      || odometer.leg.toId !== phase.nextId
+      : phase.kind === 'cruise' ? !record(odometer.leg) || odometer.leg.fromId !== expectedFrom
+        || odometer.leg.toId !== state.destinationId
+        : odometer.leg !== null) return null;
+  }
 
   return state as unknown as ReachJourneyState;
 }

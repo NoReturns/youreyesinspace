@@ -25,6 +25,7 @@ import { Input } from './input/Input';
 import { CameraController } from './camera/CameraController';
 import { ReachVoyageDirector, REACH_ITINERARY } from './reach/ReachVoyageDirector';
 import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
+import { ReachOdometerOverlay, readOdometerContract } from './reach/ReachOdometer';
 import { ReachPanoramaSync, readReachPanorama } from './reach/ReachPanorama';
 import { LocalStorageReachJourneyStore, loadReachJourney, saveReachJourney, type ReachJourneyStore } from './reach/JourneyState';
 import { ReachTiming } from './reach/ReachTiming';
@@ -69,6 +70,7 @@ class App implements UIHost {
   readonly camera: CameraController;
   readonly reach: ReachVoyageDirector | null;
   private readonly reachCountdown: ReachCountdownOverlay | null;
+  private readonly reachOdometer: ReachOdometerOverlay | null;
   private readonly panorama = REACH_MODE ? readReachPanorama() : null;
   private readonly panoramaSync = this.panorama ? new ReachPanoramaSync(this.panorama) : null;
   private lastPanoramaSequence = -1;
@@ -181,13 +183,17 @@ class App implements UIHost {
     if (REACH_MODE && this.panorama?.isPrimaryDisplay === false) {
       this.reach = null;
       this.reachCountdown = null;
+      this.reachOdometer = null;
       this.uiVisible = false;
     } else if (REACH_MODE) {
       this.reach = new ReachVoyageDirector(this.universe, this.camera, this.time,
         new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach());
       const countdown = readCountdownContract();
       this.reachCountdown = countdown ? new ReachCountdownOverlay(this.reach, countdown.position) : null;
+      const odometer = readOdometerContract();
+      this.reachOdometer = odometer ? new ReachOdometerOverlay(this.reach, odometer.position) : null;
       this.reachCountdown?.update(performance.now());
+      this.reachOdometer?.update(performance.now());
       this.uiVisible = false;
       window.addEventListener('pagehide', () => this.checkpointReach());
       document.addEventListener('visibilitychange', () => { if (document.hidden) this.checkpointReach(); });
@@ -195,6 +201,7 @@ class App implements UIHost {
     } else {
       this.reach = null;
       this.reachCountdown = null;
+      this.reachOdometer = null;
       this.showBackdrop(false);
     }
 
@@ -1166,6 +1173,7 @@ class App implements UIHost {
     }
     if (this.reach && now - this.lastReachSave >= 30_000) this.checkpointReach();
     this.reachCountdown?.update(now);
+    this.reachOdometer?.update(now);
     this.aimAtPin(dt, fovRad, eng.width / Math.max(1, eng.height));
     // backdrop bookkeeping: start circling once the return flight has arrived; any other flight
     // (or re-targeting) stops the auto-orbit, which ends the backdrop

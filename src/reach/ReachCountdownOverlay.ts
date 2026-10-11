@@ -41,13 +41,13 @@ export class ReachCountdownOverlay {
   }
 
   update(now: number): void {
-    if (now - this.lastUpdate < 1000) return;
-    this.lastUpdate = now;
     const countdown = this.director.countdown;
     if (countdown.routeIndex !== this.lastRouteIndex) {
       this.lastRouteIndex = countdown.routeIndex;
       this.element.dataset.position = resolveCountdownPosition(this.position, countdown.routeIndex);
     }
+    if (now - this.lastUpdate < 1000) return;
+    this.lastUpdate = now;
     const name = countdown.destinationId.replace(/([a-z])(\d)/g, '$1 $2').toUpperCase();
     const text = `${countdown.phase}: ${name} ${formatCountdown(countdown.secondsLeft)}`;
     if (this.element.textContent !== text) this.element.textContent = text;

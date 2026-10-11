@@ -48,7 +48,7 @@ body.reach-mode, body.reach-mode * { cursor: none !important; }
 body.reach-mode #ui { display: none; }
 html.reach-panorama #ui, html.reach-panorama #loader { display: none !important; }
 
-#reach-countdown {
+#reach-countdown, #reach-odometer {
   position: fixed;
   z-index: 11;
   max-width: calc(100vw - 32px);
@@ -60,11 +60,16 @@ html.reach-panorama #ui, html.reach-panorama #loader { display: none !important;
   pointer-events: none;
   user-select: none;
 }
-#reach-countdown[data-position^='top'] { top: calc(16px + env(safe-area-inset-top)); }
-#reach-countdown[data-position^='bottom'] { bottom: calc(16px + env(safe-area-inset-bottom)); }
-#reach-countdown[data-position$='left'] { left: calc(16px + env(safe-area-inset-left)); }
-#reach-countdown[data-position$='right'] { right: calc(16px + env(safe-area-inset-right)); }
-#reach-countdown[data-position$='centre'] { left: 50%; transform: translateX(-50%); }
+#reach-odometer {
+  white-space: pre;
+  font-size: clamp(10px, 2.5vw, 12px);
+  line-height: 1.4;
+}
+#reach-countdown[data-position^='top'], #reach-odometer[data-position^='top'] { top: calc(16px + env(safe-area-inset-top)); }
+#reach-countdown[data-position^='bottom'], #reach-odometer[data-position^='bottom'] { bottom: calc(16px + env(safe-area-inset-bottom)); }
+#reach-countdown[data-position$='left'], #reach-odometer[data-position$='left'] { left: calc(16px + env(safe-area-inset-left)); }
+#reach-countdown[data-position$='right'], #reach-odometer[data-position$='right'] { right: calc(16px + env(safe-area-inset-right)); }
+#reach-countdown[data-position$='centre'], #reach-odometer[data-position$='centre'] { left: 50%; transform: translateX(-50%); }
 
 canvas#scene, canvas#overlay {
   position: fixed;

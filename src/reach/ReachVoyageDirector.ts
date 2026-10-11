@@ -11,6 +11,7 @@ import {
   type JourneyPhase, type Quat, type ReachFlightState, type ReachJourneyState, type Vec3,
 } from './JourneyState';
 import { ReachTiming, type ReachTimingDestination } from './ReachTiming';
+import { geometricLegKm, type ReachDistanceLeg } from './ReachOdometer';
 
 type Stop = ReachTimingDestination;
 
@@ -77,6 +78,9 @@ export class ReachVoyageDirector {
   private stage: 'observe' | 'flyby' | 'departure' | 'cruise' = 'observe';
   private observeLeft = 0;
   private observeDuration = 0;
+  private completedKm = 0;
+  private roundTripCount = 0;
+  private leg: ReachDistanceLeg | null = null;
   private flyby: {
     body: CelestialBody; offset: Vector3; orientation: Quaternion; up: Vector3;
     elapsed: number; duration: number;
@@ -87,6 +91,12 @@ export class ReachVoyageDirector {
   } | null = null;
 
   get directing(): boolean { return this.stage === 'departure' || this.stage === 'flyby'; }
+  get roundTrips(): number { return this.roundTripCount; }
+  get distanceTravelledKm(): number {
+    const flight = this.stage === 'cruise' ? this.camera.autopilot : null;
+    const progress = flight && flight.duration > 0 ? Math.min(1, Math.max(0, flight.t / flight.duration)) : 0;
+    return this.completedKm + (this.leg?.distanceKm ?? 0) * progress;
+  }
 
   get countdown(): { phase: 'NEXT' | 'DEPART' | 'CRUISE'; destinationId: string; routeIndex: number; secondsLeft: number } {
     if (this.stage === 'departure') {
@@ -152,6 +162,8 @@ export class ReachVoyageDirector {
       destinationId: current.id, routeIndex: this.stop, phase,
       simulation: { jd: this.time.jd, rate: this.time.rate },
       frame: { starId: this.universe.current.starId },
+      odometer: { completedKm: this.completedKm, roundTrips: this.roundTripCount,
+        leg: this.leg ? { ...this.leg } : null },
       camera: { position: vec(c.position), orientation: quat(c.quaternion),
         referenceId: c.reference.id, targetId: c.target.id, autoOrbit: c.autoOrbit, flight },
     };
@@ -159,6 +171,15 @@ export class ReachVoyageDirector {
 
   private restore(saved: ReachJourneyState): void {
     this.stop = REACH_ITINERARY.findIndex((stop) => stop.id === saved.destinationId);
+    this.completedKm = saved.odometer?.completedKm ?? 0;
+    this.roundTripCount = saved.odometer?.roundTrips ?? 0;
+    this.leg = saved.odometer?.leg ? { ...saved.odometer.leg } : null;
+    if (!saved.odometer && (saved.phase.kind === 'departure' || saved.phase.kind === 'cruise')) {
+      const fromId = saved.phase.kind === 'departure' ? saved.destinationId
+        : REACH_ITINERARY[(this.stop - 1 + REACH_ITINERARY.length) % REACH_ITINERARY.length].id;
+      const toId = saved.phase.kind === 'departure' ? saved.phase.nextId : saved.destinationId;
+      this.leg = this.makeLeg(fromId, toId);
+    }
     const c = this.camera;
     c.position.fromArray(saved.camera.position);
     c.quaternion.fromArray(saved.camera.orientation);
@@ -203,6 +224,10 @@ export class ReachVoyageDirector {
     if (this.stage === 'flyby') { this.updateFlyby(dt); return; }
     if (this.stage === 'cruise') {
       if (this.camera.autopilot) return;
+      if (this.leg && this.leg.toId === REACH_ITINERARY[this.stop].id) {
+        this.completedKm += this.leg.distanceKm;
+        this.leg = null;
+      }
       const stop = REACH_ITINERARY[this.stop];
       if (stop.profile === 'moon') {
         const body = this.body(stop.id);
@@ -241,11 +266,13 @@ export class ReachVoyageDirector {
 
   private beginDeparture(radialSpeed: number, orbitRate: number): void {
     const source = this.body(REACH_ITINERARY[this.stop].id);
+    const next = (this.stop + 1) % REACH_ITINERARY.length;
+    this.leg = this.makeLeg(source.id, REACH_ITINERARY[next].id);
     const offset = new Vector3().subVectors(this.camera.position, source.position);
     const isMoon = REACH_ITINERARY[this.stop].profile === 'moon';
     const duration = this.timing.departure(REACH_ITINERARY[this.stop]);
     this.departure = {
-      source, next: (this.stop + 1) % REACH_ITINERARY.length, offset,
+      source, next, offset,
       orientation: this.camera.quaternion.clone(),
       up: new Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).normalize(),
       orbitRate, radialSpeed,
@@ -373,5 +400,10 @@ export class ReachVoyageDirector {
     const body = this.universe.get(id);
     if (!body) throw new Error(`Reach destination missing: ${id}`);
     return body;
+  }
+
+  private makeLeg(fromId: string, toId: string): ReachDistanceLeg {
+    return { fromId, toId, departureJd: this.time.jd,
+      distanceKm: geometricLegKm(this.universe.current.origin, this.body(fromId).position, this.body(toId).position) };
   }
 }
