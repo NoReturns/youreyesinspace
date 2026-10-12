@@ -54,7 +54,7 @@ export class ReachCountdownOverlay {
     if (now - this.lastUpdate < 1000 && cinematicStage === this.lastCinematicStage) return;
     this.lastUpdate = now;
     this.lastCinematicStage = cinematicStage;
-    if (import.meta.env?.DEV !== false && cinematic) {
+    if (cinematic) {
       const text = cinematic.terminal
         ? 'ALPHA CENTAURI A/B - FINAL OVERVIEW'
         : `${cinematic.label} ${formatCountdown(cinematic.secondsLeft)}`;

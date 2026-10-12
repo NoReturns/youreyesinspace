@@ -1,9 +1,10 @@
 import type { ReachOdometerState } from './ReachOdometer';
 import { destinationRef, destinationSystem, type ReachRoute, type ReachStop } from './ReachDestinations';
+import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, alphaShotSeconds } from './ReachAlphaCentauri';
 
 export const REACH_JOURNEY_KEY = 'the-reach:journey:v1';
 export const REACH_ITINERARY_ID = 'solar-system-41';
-export const REACH_ITINERARY_VERSION = 3;
+export const REACH_ITINERARY_VERSION = 4;
 const EXPANDED_STOP_IDS = new Set(['iss', 'hubble', 'jwst', 'juno', 'newhorizons', 'parker']);
 /** Authored version 2 order, retained solely to validate and finish saved legs. */
 const V2_STOP_IDS = [
@@ -15,8 +16,32 @@ const V2_STOP_IDS = [
   'sun', 'parker', 'mercury', 'venus',
 ] as const;
 const V1_STOP_IDS: readonly string[] = V2_STOP_IDS.filter((id) => !EXPANDED_STOP_IDS.has(id));
-export function previousReachStopId(version: 1 | 2, destinationId: string): string | null {
-  const ids: readonly string[] = version === 1 ? V1_STOP_IDS : V2_STOP_IDS;
+/** The approved version 3 order. Keep it to validate saved legs across the v4 extension. */
+const V3_STOP_IDS = [
+  'earth', 'iss', 'hubble', 'moon', 'jwst', 'sun', 'parker', 'mercury', 'venus',
+  'mars', 'phobos', 'deimos', 'vesta', 'ceres', 'jupiter', 'juno', 'io', 'europa',
+  'ganymede', 'callisto', 'saturn', 'mimas', 'enceladus', 'tethys', 'dione',
+  'rhea', 'titan', 'iapetus', 'halley', 'uranus', 'miranda', 'ariel', 'umbriel',
+  'titania', 'oberon', 'neptune', 'triton', 'pluto', 'charon', 'haumea',
+  'makemake', 'newhorizons', 'eris', 'pioneer11', 'pioneer10', 'voyager2', 'voyager1',
+] as const;
+/** Archive this order when a later itinerary version is introduced. */
+export const V4_STOP_IDS = [
+  ...V3_STOP_IDS, 'star:c64548', 'alpha-centauri-ab', 'star:c80155',
+  'star:c108500', 'star:c49269', 'star:c29786', 'star:c109365',
+  'star:c15247', 'star:c7458', 'star:c83130',
+] as const;
+export type ReachDirection = 'outbound' | 'inbound';
+export function reachStopIdsForVersion(version: number): readonly string[] | null {
+  if (version === 1) return V1_STOP_IDS;
+  if (version === 2) return V2_STOP_IDS;
+  if (version === 3) return V3_STOP_IDS;
+  if (version === 4) return V4_STOP_IDS;
+  return null;
+}
+export function previousReachStopId(version: number, destinationId: string): string | null {
+  const ids = reachStopIdsForVersion(version);
+  if (!ids) return null;
   const index = ids.indexOf(destinationId);
   return index < 0 ? null : ids[(index - 1 + ids.length) % ids.length];
 }
@@ -31,7 +56,9 @@ export type JourneyPhase =
   | ({ kind: 'flyby'; bodyId: string; offset: Vec3; orientation: Quat; up: Vec3 } & TimedPhase)
   | ({ kind: 'departure'; sourceId: string; nextId: string; offset: Vec3; orientation: Quat;
        up: Vec3; orbitRate: number; radialSpeed: number; endRadius: number } & TimedPhase)
-  | ({ kind: 'cruise' } & TimedPhase);
+  | ({ kind: 'cruise' } & TimedPhase)
+  | ({ kind: 'binary'; shot: string; entryPosition: Vec3; entryTarget: Vec3;
+       side: Vec3; up: Vec3 } & TimedPhase);
 
 export interface ReachFlightState {
   targetId: string;
@@ -52,8 +79,11 @@ export interface ReachJourneyState {
   itinerary: { id: string; version: number };
   destinationId: string;
   routeIndex: number;
-  /** Original route for a saved departure/cruise still crossing a v3 reorder boundary. */
-  transitionFromVersion?: 1 | 2;
+  direction: ReachDirection;
+  /** Inbound follows the route on which the return began, even after a future expansion. */
+  cycleItineraryVersion: number;
+  /** Original route for a saved departure/cruise crossing an itinerary boundary. */
+  transitionFromVersion?: number;
   phase: JourneyPhase;
   simulation: { jd: number; rate: number };
   frame: { starId: string };
@@ -104,18 +134,21 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
   let state: unknown;
   try { state = JSON.parse(raw); } catch { return null; }
   const sourceVersion = record(state) && record(state.itinerary) ? state.itinerary.version : null;
-  const migrating = routeId === REACH_ITINERARY_ID && routeVersion === 3
-    && (sourceVersion === 1 || sourceVersion === 2);
+  const productionRoute = routeId === REACH_ITINERARY_ID && routeVersion >= 4;
+  const migrating = productionRoute && typeof sourceVersion === 'number'
+    && Number.isSafeInteger(sourceVersion) && sourceVersion < routeVersion
+    && reachStopIdsForVersion(sourceVersion) !== null;
   const sourceIds: readonly string[] = migrating
-    ? sourceVersion === 1 ? V1_STOP_IDS : V2_STOP_IDS : route.map((stop) => stop.id);
+    ? reachStopIdsForVersion(sourceVersion as number)! : route.map((stop) => stop.id);
   const destination = record(state) && typeof state.destinationId === 'string'
     ? route.find((stop) => stop.id === state.destinationId) : undefined;
   if (!record(state) || state.schema !== 1 || !record(state.itinerary)
     || state.itinerary.id !== routeId || (!migrating && sourceVersion !== routeVersion)
     || typeof state.destinationId !== 'string' || !destination
-    || !hasBody(state.destinationId) || !Number.isInteger(state.routeIndex) || !finite(state.routeIndex)
-    || state.routeIndex < 0 || state.routeIndex >= sourceIds.length
-    || sourceIds[state.routeIndex] !== state.destinationId
+    || !hasBody(state.destinationId) || !Number.isSafeInteger(state.routeIndex)
+    || (state.routeIndex as number) < 0
+    || ((migrating || !productionRoute) && (state.routeIndex as number) >= sourceIds.length)
+    || ((migrating || !productionRoute) && sourceIds[state.routeIndex as number] !== state.destinationId)
     || !record(state.simulation) || !finite(state.simulation.jd)
     || state.simulation.jd < 2_000_000 || state.simulation.jd > 3_000_000
     || !finite(state.simulation.rate) || state.simulation.rate <= 0 || state.simulation.rate > 1_000_000
@@ -123,18 +156,37 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
     || !record(state.camera) || !vec3(state.camera.position) || !quat(state.camera.orientation)
     || typeof state.camera.referenceId !== 'string' || !hasBody(state.camera.referenceId)
     || typeof state.camera.targetId !== 'string' || !hasBody(state.camera.targetId)
-    || state.camera.referenceId !== state.camera.targetId
     || !finite(state.camera.autoOrbit) || Math.abs(state.camera.autoOrbit) > 1
     || !record(state.phase) || !duration(state.phase.duration)
     || !progress(state.phase.elapsed, state.phase.duration)) return null;
 
   const phase = state.phase;
-  const transitionVersion = migrating && (phase.kind === 'departure' || phase.kind === 'cruise') ? sourceVersion
-    : state.transitionFromVersion === 1 || state.transitionFromVersion === 2
-      ? state.transitionFromVersion : null;
-  if (state.transitionFromVersion !== undefined && (migrating || transitionVersion === null)) return null;
+  const active = phase.kind === 'departure' || phase.kind === 'cruise';
+  const savedTransition = state.transitionFromVersion;
+  if (savedTransition !== undefined && (!Number.isSafeInteger(savedTransition)
+    || reachStopIdsForVersion(savedTransition as number) === null
+    || (savedTransition as number) >= (sourceVersion as number)
+    || !active || !productionRoute)) return null;
+  const transitionVersion: number | null = typeof savedTransition === 'number' ? savedTransition
+    : migrating && active ? sourceVersion as number : null;
   if (transitionVersion !== null && phase.kind !== 'departure' && phase.kind !== 'cruise') return null;
-  const transitionIds: readonly string[] = transitionVersion === 1 ? V1_STOP_IDS : V2_STOP_IDS;
+  const transitionIds: readonly string[] = transitionVersion === null ? sourceIds
+    : reachStopIdsForVersion(transitionVersion)!;
+  const direction: ReachDirection = migrating && (sourceVersion as number) < 4 ? 'outbound'
+    : state.direction === 'outbound' || state.direction === 'inbound' ? state.direction : 'outbound';
+  const cycleVersion = migrating && (sourceVersion as number) < 4 ? routeVersion
+    : migrating && direction === 'outbound' ? routeVersion : state.cycleItineraryVersion;
+  if (productionRoute && (!migrating || (sourceVersion as number) >= 4)
+    && (state.direction !== 'outbound' && state.direction !== 'inbound'
+      || !Number.isSafeInteger(cycleVersion) || (cycleVersion as number) < 4
+      || (cycleVersion as number) > routeVersion
+      || ((cycleVersion as number) !== routeVersion
+        && !reachStopIdsForVersion(cycleVersion as number)))) return null;
+  const cycleIds = productionRoute
+    ? (cycleVersion === routeVersion ? route.map((stop) => stop.id)
+      : reachStopIdsForVersion(cycleVersion as number)!) : sourceIds;
+  const transitionDirection: ReachDirection = transitionVersion !== null && transitionVersion >= 4
+    ? direction : 'outbound';
   const predecessor = (ids: readonly string[], id: string): string | null => {
     const index = ids.indexOf(id);
     return index < 0 ? null : ids[(index - 1 + ids.length) % ids.length];
@@ -147,6 +199,8 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
   const expectedBodyId = currentRef.kind === 'star' ? `s${currentRef.starId.slice(1)}-star` : currentRef.bodyId;
   const expectedFrame = destinationSystem(destination);
   if (state.frame.starId !== expectedFrame || state.camera.referenceId !== expectedBodyId) return null;
+  const binaryTargets = [ALPHA_BARY_ID, `s${ALPHA_A_INDEX}-star`, `s${ALPHA_B_INDEX}-star`];
+  if (phase.kind !== 'binary' && state.camera.referenceId !== state.camera.targetId) return null;
   if (phase.kind !== 'observe' && state.camera.autoOrbit !== 0) return null;
   if (phase.kind === 'observe') {
     if (destination.profile === 'moon' || state.camera.flight !== null) return null;
@@ -157,7 +211,11 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
   } else if (phase.kind === 'departure') {
     if (phase.sourceId !== expectedBodyId || typeof phase.nextId !== 'string'
       || !route.some((stop) => stop.id === phase.nextId) || !hasBody(phase.nextId)
-      || phase.nextId !== successor(transitionVersion === null ? sourceIds : transitionIds, state.destinationId)
+      || phase.nextId !== (transitionVersion !== null
+        ? transitionDirection === 'inbound'
+          ? predecessor(transitionIds, state.destinationId) : successor(transitionIds, state.destinationId)
+        : direction === 'inbound' ? predecessor(cycleIds, state.destinationId)
+          : successor(sourceIds, state.destinationId))
       || !nonzeroVec(phase.offset) || !quat(phase.orientation) || !unit(phase.up)
       || !finite(phase.orbitRate) || Math.abs(phase.orbitRate) > 1
       || !finite(phase.radialSpeed) || !finite(phase.endRadius) || phase.endRadius <= 0 || phase.endRadius >= 1e15
@@ -172,6 +230,13 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
       || !quat(flight.startOrientation) || (flight.up !== null && !unit(flight.up))
       || typeof flight.gentleStart !== 'boolean'
       || (flight.cinematicCruise !== undefined && typeof flight.cinematicCruise !== 'boolean')) return null;
+  } else if (phase.kind === 'binary') {
+    if (state.destinationId !== 'alpha-centauri-ab'
+      || !binaryTargets.includes(state.camera.targetId as string)
+      || state.camera.flight !== null
+      || typeof phase.shot !== 'string' || alphaShotSeconds(phase.shot) !== phase.duration
+      || !vec3(phase.entryPosition) || !vec3(phase.entryTarget)
+      || !unit(phase.side) || !unit(phase.up)) return null;
   } else return null;
 
   if (state.odometer !== undefined) {
@@ -188,17 +253,20 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
     if (phase.kind === 'departure' ? !record(odometer.leg) || odometer.leg.fromId !== state.destinationId
       || odometer.leg.toId !== phase.nextId
       : phase.kind === 'cruise' ? !record(odometer.leg)
-        || odometer.leg.fromId !== predecessor(transitionVersion === null ? sourceIds : transitionIds,
-          state.destinationId)
+        || odometer.leg.fromId !== (transitionVersion !== null
+          ? transitionDirection === 'inbound'
+            ? successor(transitionIds, state.destinationId) : predecessor(transitionIds, state.destinationId)
+          : direction === 'inbound' ? successor(cycleIds, state.destinationId)
+            : predecessor(sourceIds, state.destinationId))
         || odometer.leg.toId !== state.destinationId
         : odometer.leg !== null) return null;
   }
 
   const parsed = state as unknown as ReachJourneyState;
-  return migrating ? { ...parsed, itinerary: { id: routeId, version: routeVersion },
+  return { ...parsed, itinerary: { id: routeId, version: routeVersion },
     routeIndex: route.findIndex((stop) => stop.id === parsed.destinationId),
-    ...((phase.kind === 'departure' || phase.kind === 'cruise')
-      ? { transitionFromVersion: sourceVersion as 1 | 2 } : {}) } : parsed;
+    direction, cycleItineraryVersion: productionRoute ? cycleVersion as number : routeVersion,
+    ...(transitionVersion !== null ? { transitionFromVersion: transitionVersion } : {}) };
 }
 
 export function loadReachJourney(store: ReachJourneyStore, route: readonly ReachRouteStop[] | ReachRoute,

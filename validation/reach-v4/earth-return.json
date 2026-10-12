@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "itinerary": {
+    "id": "solar-system-41",
+    "version": 4
+  },
+  "destinationId": "iss",
+  "routeIndex": 1,
+  "direction": "inbound",
+  "cycleItineraryVersion": 4,
+  "phase": {
+    "kind": "departure",
+    "sourceId": "iss",
+    "nextId": "earth",
+    "offset": [
+      0.15033483505249023,
+      0.037806714061844104,
+      -0.19294129312038422
+    ],
+    "orientation": [
+      0.9415901552975744,
+      -0.0564656978448191,
+      0.3165439009729471,
+      -0.10009776805911223
+    ],
+    "up": [
+      -0.04296441444514501,
+      -0.9735841235929636,
+      -0.224249890477358
+    ],
+    "orbitRate": 0.006,
+    "radialSpeed": 0,
+    "endRadius": 1.485000034537933,
+    "elapsed": 0,
+    "duration": 10
+  },
+  "simulation": {
+    "jd": 2461323.561712628,
+    "rate": 1
+  },
+  "frame": {
+    "starId": "c0"
+  },
+  "odometer": {
+    "completedKm": 1936006286112419.2,
+    "roundTrips": 0,
+    "leg": {
+      "fromId": "iss",
+      "toId": "earth",
+      "departureJd": 2461323.561712628,
+      "distanceKm": 6789.78927940511
+    }
+  },
+  "camera": {
+    "position": [
+      143332337.54065588,
+      -5639.848908586552,
+      -42167039.22592064
+    ],
+    "orientation": [
+      0.9415901552975744,
+      -0.0564656978448191,
+      0.3165439009729471,
+      -0.10009776805911223
+    ],
+    "referenceId": "iss",
+    "targetId": "iss",
+    "autoOrbit": 0,
+    "flight": null
+  }
+}

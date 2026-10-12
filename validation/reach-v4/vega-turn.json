@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "itinerary": {
+    "id": "solar-system-41",
+    "version": 4
+  },
+  "destinationId": "star:c83130",
+  "routeIndex": 56,
+  "direction": "inbound",
+  "cycleItineraryVersion": 4,
+  "phase": {
+    "kind": "observe",
+    "elapsed": 0,
+    "duration": 8
+  },
+  "simulation": {
+    "jd": 2461323.5310762203,
+    "rate": 1
+  },
+  "frame": {
+    "starId": "c83130"
+  },
+  "odometer": {
+    "completedKm": 968003142925466.6,
+    "roundTrips": 0,
+    "leg": null
+  },
+  "camera": {
+    "position": [
+      3059340.7598917335,
+      -11569003.054765167,
+      -6305660.06076142
+    ],
+    "orientation": [
+      0.21781619785829825,
+      0.8280360695063371,
+      -0.4494334067027761,
+      0.25479792873292406
+    ],
+    "referenceId": "s83130-star",
+    "targetId": "s83130-star",
+    "autoOrbit": 0.012,
+    "flight": null
+  }
+}

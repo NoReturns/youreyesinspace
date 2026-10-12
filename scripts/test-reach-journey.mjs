@@ -40,7 +40,10 @@ const {
   ReachPanoramaSync, applyPanoramaView, localPanoramaFovRad, parseReachPanorama, readReachPanorama,
 } = module.exports;
 
-const route = REACH_ITINERARY;
+// Keep the original Solar-only harness as a v3 migration fixture. The v4 production
+// route uses real interstellar systems and has separate full-cycle coverage.
+const route = REACH_ITINERARY.slice(0, 47);
+const legacyProductionRoute = { id: 'solar-system-41', version: 3, stops: route, repeat: true };
 const input = { flush: () => ({ dx: 0, dy: 0, wheel: 0, pinch: 0, panX: 0, panY: 0 }), down: () => false };
 const date = '2026-10-10T00:00:00Z';
 
@@ -57,7 +60,7 @@ function makeRun(saved = null, { mode = 'test', random = () => 0.5, onPhaseChang
   };
   const camera = new CameraController(universe);
   const director = new ReachVoyageDirector(universe, camera, time, new ReachTiming(mode, random), saved, onPhaseChange,
-    selectedRoute);
+    selectedRoute ?? legacyProductionRoute);
   return { time, system, universe, camera, director };
 }
 
@@ -155,7 +158,7 @@ const valid = fresh.director.capture();
 const hasBody = (id) => !!fresh.universe.get(id);
 assert.equal(parseReachJourney('{bad json', route, hasBody), null);
 assert.equal(parseReachJourney(JSON.stringify({ ...valid, schema: 2 }), route, hasBody), null);
-assert.equal(parseReachJourney(JSON.stringify({ ...valid, itinerary: { ...valid.itinerary, version: 4 } }), route, hasBody), null);
+assert.equal(parseReachJourney(JSON.stringify({ ...valid, itinerary: { ...valid.itinerary, version: 5 } }), route, hasBody), null);
 assert.equal(parseReachJourney(JSON.stringify({ ...valid, destinationId: 'removed' }), route, hasBody), null);
 assert.equal(parseReachJourney(JSON.stringify(valid), route, (id) => id !== 'earth' && hasBody(id)), null);
 assert.equal(parseReachJourney(JSON.stringify({ ...valid, camera: { ...valid.camera, orientation: [0, 0, 0, 0] } }), route, hasBody), null);
@@ -573,14 +576,14 @@ v1Cruise.odometer.leg = { fromId: 'earth', toId: 'moon', distanceKm: 384_400,
   departureJd: v1Cruise.simulation.jd - 0.001 };
 const migratedCruise = parseReachJourney(JSON.stringify(v1Cruise), route, hasBody);
 assert.ok(migratedCruise, 'valid v1 cruise migrates');
-assert.equal(migratedCruise.itinerary.version, 3);
+assert.equal(migratedCruise.itinerary.version, 4);
 assert.equal(migratedCruise.routeIndex, route.findIndex((stop) => stop.id === 'moon'));
 assert.deepEqual(migratedCruise.odometer, v1Cruise.odometer, 'odometer history and active leg survive');
 const migratedRun = makeRun(migratedCruise);
 assert.equal(migratedRun.director.capture().phase.kind, 'cruise');
 const migratedCheckpoint = migratedRun.director.capture();
 assert.ok(parseReachJourney(JSON.stringify(migratedCheckpoint), route, hasBody),
-  'migrated active legacy leg survives a second restart as route v3');
+  'migrated active legacy leg survives a second restart as route v4');
 const noOdometer = structuredClone(v1Cruise);
 delete noOdometer.odometer;
 const restoredNoOdometer = makeRun(parseReachJourney(JSON.stringify(noOdometer), route, hasBody));
@@ -625,8 +628,8 @@ for (const oldRoute of historicalRoutes) {
     saved.odometer.completedKm += 987_654_321;
     saved.odometer.roundTrips = 4;
     const migrated = parseReachJourney(JSON.stringify(saved), route, hasBody);
-    assert.ok(migrated, `v${oldRoute.version} ${kind} migrates directly to v3`);
-    assert.equal(migrated.itinerary.version, 3);
+    assert.ok(migrated, `v${oldRoute.version} ${kind} migrates directly to v4`);
+    assert.equal(migrated.itinerary.version, 4);
     assert.equal(migrated.routeIndex, approvedIds.indexOf(saved.destinationId));
     assert.deepEqual(migrated.phase, saved.phase);
     assert.deepEqual(migrated.simulation, saved.simulation);
@@ -641,14 +644,14 @@ for (const oldRoute of historicalRoutes) {
     assert.equal(resumed.director.distanceTravelledKm,
       saved.odometer.completedKm + (kind === 'cruise'
         ? saved.odometer.leg.distanceKm * saved.phase.elapsed / saved.phase.duration : 0));
-    const v3Checkpoint = resumed.director.capture();
-    const reloaded = parseReachJourney(JSON.stringify(v3Checkpoint), route, hasBody);
+    const v4Checkpoint = resumed.director.capture();
+    const reloaded = parseReachJourney(JSON.stringify(v4Checkpoint), route, hasBody);
     assert.ok(reloaded, `v${oldRoute.version} ${kind} reloads after migration`);
     assert.deepEqual(reloaded.phase, migrated.phase);
     assert.deepEqual(reloaded.odometer, migrated.odometer);
   }
 }
-console.log('PASS v1 and v2 observation, departure, flyby, and cruise migration to v3');
+console.log('PASS v1 and v2 observation, departure, flyby, and cruise migration to v4');
 
 for (const oldRoute of historicalRoutes) {
   const fromId = oldRoute.version === 1 ? 'earth' : 'jwst';

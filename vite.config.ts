@@ -20,7 +20,7 @@ export default defineConfig({
     transformIndexHtml(html) {
       return html
         .replace(/<title>.*?<\/title>/, '<title>The Reach Screensaver</title>')
-        .replace(/^.*<meta name="description".*\r?\n/gm, '    <meta name="description" content="The Reach Screensaver: a 41-stop Solar System voyage." />\n')
+        .replace(/^.*<meta name="description".*\r?\n/gm, '    <meta name="description" content="The Reach Screensaver: a 57-stop interstellar round trip." />\n')
         .replace(/^.*(?:rel="canonical"|property="og:|name="twitter:|rel="icon"|rel="apple-touch-icon").*\r?\n/gm, '')
         .replace(/^.*<img class="brand-mark".*\r?\n/gm, '')
         .replace('<span class="brand-name">YOUR EYES IN SPACE</span>', '<span class="brand-name">THE REACH SCREENSAVER</span>')

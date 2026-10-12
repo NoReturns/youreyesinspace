@@ -16,7 +16,7 @@ export interface ReachStop extends ReachTimingDestination {
     coronaMotion: number;
     colorWarmth: number;
   };
-  /** Development-only A/B establishing or departure overview. */
+  /** A/B barycentric establishing and departure overview. */
   binaryOverview?: boolean;
 }
 

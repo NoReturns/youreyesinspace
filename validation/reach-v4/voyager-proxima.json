@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "itinerary": {
+    "id": "solar-system-41",
+    "version": 4
+  },
+  "destinationId": "voyager1",
+  "routeIndex": 46,
+  "direction": "outbound",
+  "cycleItineraryVersion": 4,
+  "phase": {
+    "kind": "departure",
+    "sourceId": "voyager1",
+    "nextId": "star:c64548",
+    "offset": [
+      0.0103912353515625,
+      -0.026777267456054688,
+      -0.005512237548828125
+    ],
+    "orientation": [
+      0.4658075231511349,
+      0.6142724808271607,
+      -0.33392620574591964,
+      0.5423891221165705
+    ],
+    "up": [
+      0.934501368840499,
+      0.3430332809838774,
+      0.09505450948098251
+    ],
+    "orbitRate": 0.006,
+    "radialSpeed": 0,
+    "endRadius": 1.95,
+    "elapsed": 0,
+    "duration": 10
+  },
+  "simulation": {
+    "jd": 2461323.5249188463,
+    "rate": 1
+  },
+  "frame": {
+    "starId": "c0"
+  },
+  "odometer": {
+    "completedKm": 197179320791.93713,
+    "roundTrips": 0,
+    "leg": {
+      "fromId": "voyager1",
+      "toId": "star:c64548",
+      "departureJd": 2461323.5249188463,
+      "distanceKm": 39979307981976.94
+    }
+  },
+  "camera": {
+    "position": [
+      -5108123614.702938,
+      14850656334.586485,
+      20446115399.474545
+    ],
+    "orientation": [
+      0.4658075231511349,
+      0.6142724808271607,
+      -0.33392620574591964,
+      0.5423891221165705
+    ],
+    "referenceId": "voyager1",
+    "targetId": "voyager1",
+    "autoOrbit": 0,
+    "flight": null
+  }
+}

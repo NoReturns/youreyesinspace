@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "itinerary": {
+    "id": "solar-system-41",
+    "version": 4
+  },
+  "destinationId": "alpha-centauri-ab",
+  "routeIndex": 48,
+  "direction": "outbound",
+  "cycleItineraryVersion": 4,
+  "phase": {
+    "kind": "binary",
+    "shot": "establish",
+    "elapsed": 0,
+    "duration": 9,
+    "entryPosition": [
+      3981531603.9939485,
+      -1053311148.3211427,
+      1661127608.5538623
+    ],
+    "entryTarget": [
+      0,
+      0,
+      0
+    ],
+    "side": [
+      0.8965639138490104,
+      -0.23718530224482492,
+      0.37405384743747155
+    ],
+    "up": [
+      0.22552629644891967,
+      0.9713190553735556,
+      0.07534707876392932
+    ]
+  },
+  "simulation": {
+    "jd": 2461323.5258910633,
+    "rate": 1
+  },
+  "frame": {
+    "starId": "c65262"
+  },
+  "odometer": {
+    "completedKm": 41954471823196.945,
+    "roundTrips": 0,
+    "leg": null
+  },
+  "camera": {
+    "position": [
+      3981531603.9939485,
+      -1053311148.3211427,
+      1661127608.5538623
+    ],
+    "orientation": [
+      0.09463607600258445,
+      0.5513774614004512,
+      -0.07337905308775315,
+      0.8256163895819727
+    ],
+    "referenceId": "alpha-centauri-ab-bary",
+    "targetId": "alpha-centauri-ab-bary",
+    "autoOrbit": 0,
+    "flight": null
+  }
+}

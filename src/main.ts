@@ -23,7 +23,7 @@ import { Overlay, type StarSelectionScreen } from './render/Overlay';
 import type { NamedStarScreen } from './render/StarPoints';
 import { Input } from './input/Input';
 import { CameraController } from './camera/CameraController';
-import { ReachVoyageDirector, REACH_PRODUCTION_ROUTE, reachPreviewRoute } from './reach/ReachVoyageDirector';
+import { ReachVoyageDirector, REACH_ALPHA_DESTINATION_ID, REACH_PRODUCTION_ROUTE, reachPreviewRoute } from './reach/ReachVoyageDirector';
 import { destinationRef, reachPilotStarAppearance, reachStarVisualDrift, REACH_PROXIMA_PILOT } from './reach/ReachDestinations';
 import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
 import { ReachOdometerOverlay, readOdometerContract } from './reach/ReachOdometer';
@@ -32,7 +32,7 @@ import { LocalStorageReachJourneyStore, REACH_PROXIMA_PILOT_KEY, inspectReachJou
 import { ReachTiming } from './reach/ReachTiming';
 import { ReachArrivalTrace } from './reach/ReachArrivalTrace';
 import { suppressProximaPlanetMeshes } from './reach/ReachPlanetMeshIsolation';
-import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_SYSTEM_ID,
+import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, ALPHA_SYSTEM_ID,
   alphaPointDirection, createAlphaCentauriPreviewSystem } from './reach/ReachAlphaCentauri';
 import { preparePlanetResources } from './reach/ReachPlanetResourcePreparation';
 import { PerseveranceSurfacePreview, marsPreviewDaylightJd } from './reach/PerseveranceSurfacePreview';
@@ -60,6 +60,14 @@ const REACH_PILOT = import.meta.env.DEV && REACH_MODE
   && new URLSearchParams(window.location.search).get('reachPilot') === 'proxima';
 const REACH_PREVIEW_ID = import.meta.env.DEV && REACH_MODE
   ? new URLSearchParams(window.location.search).get('reachPreview') : null;
+const REACH_INSPECT_ID = import.meta.env.DEV && REACH_MODE
+  ? new URLSearchParams(window.location.search).get('reachInspect') : null;
+const REACH_INSPECT_FIXTURES = new Set([
+  'voyager-proxima', 'proxima-alpha', 'alpha-establish', 'alpha-cross',
+  'alpha-a', 'alpha-b', 'alpha-final', 'alpha-inbound', 'vega-turn', 'earth-return',
+]);
+if (REACH_INSPECT_ID && !REACH_INSPECT_FIXTURES.has(REACH_INSPECT_ID))
+  throw new Error(`Unknown Reach inspection checkpoint: ${REACH_INSPECT_ID}`);
 const REACH_PREVIEW_ROUTE = REACH_PREVIEW_ID ? reachPreviewRoute(REACH_PREVIEW_ID) : null;
 if (REACH_PREVIEW_ID && !REACH_PREVIEW_ROUTE) throw new Error(`Unknown Reach preview stop: ${REACH_PREVIEW_ID}`);
 const REACH_ALPHA_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:alpha-centauri';
@@ -87,7 +95,8 @@ if (REACH_SURFACE_PREVIEW && (new URLSearchParams(window.location.search).get('p
   throw new Error('Perseverance surface preview requires a standalone development browser');
 const REACH_ROUTE = REACH_PREVIEW_ROUTE ?? (REACH_PILOT ? REACH_PROXIMA_PILOT : REACH_PRODUCTION_ROUTE);
 const REACH_TIMING_MODE = REACH_PREVIEW_ROUTE ? 'preview'
-  : new URLSearchParams(window.location.search).get('timing') === 'test' ? 'test' : 'production';
+  : import.meta.env.DEV && new URLSearchParams(window.location.search).get('timing') === 'test'
+    ? 'test' : 'production';
 
 class App implements UIHost {
   readonly universe: Universe;
@@ -118,7 +127,7 @@ class App implements UIHost {
   private readonly panoramaSync = this.panorama ? new ReachPanoramaSync(this.panorama) : null;
   private lastPanoramaSequence = -1;
   private readonly reachStore: ReachJourneyStore | null = REACH_MODE && !REACH_FLICKER
-    && !REACH_PREVIEW_ROUTE && !REACH_SURFACE_PREVIEW
+    && !REACH_PREVIEW_ROUTE && !REACH_SURFACE_PREVIEW && !REACH_INSPECT_ID
     && this.panorama?.isPrimaryDisplay !== false
     ? new LocalStorageReachJourneyStore(REACH_PILOT ? REACH_PROXIMA_PILOT_KEY : undefined) : null;
   private lastReachSave = performance.now();
@@ -181,7 +190,7 @@ class App implements UIHost {
     this.maxPointPx = Math.max(32, Math.min(256, (range?.[1] ?? 64) / this.engine.pixelRatio));
 
     this.universe = new Universe(catalog,
-      REACH_ALPHA_PREVIEW ? createAlphaCentauriPreviewSystem(catalog) : null);
+      REACH_MODE ? createAlphaCentauriPreviewSystem(catalog) : null);
     let savedJourney = REACH_PREVIEW_ROUTE || REACH_SURFACE_PREVIEW ? null : diagnosticJourney;
     if (this.reachStore && !REACH_PREVIEW_ROUTE && !REACH_SURFACE_PREVIEW) {
       const stored = inspectReachJourneyStore(this.reachStore, REACH_ROUTE, (id) => {
@@ -191,7 +200,16 @@ class App implements UIHost {
           const system = this.universe.system(ref.kind === 'star' ? ref.starId : ref.systemId);
           return !!(ref.kind === 'star' ? system.star : system.get(ref.bodyId));
         }
-        return !!this.universe.get(id) || (REACH_PILOT && !!this.universe.system('c64548').get(id));
+        if (this.universe.get(id) || this.universe.system('c0').get(id)) return true;
+        if (id === ALPHA_BARY_ID || id === `s${ALPHA_A_INDEX}-star`
+          || id === `s${ALPHA_B_INDEX}-star`)
+          return !!this.universe.system(ALPHA_SYSTEM_ID).get(id);
+        const catalogueStar = /^s(\d+)-star$/.exec(id);
+        return !!(catalogueStar && REACH_ROUTE.stops.some((candidate) => {
+          const ref = destinationRef(candidate);
+          return ref.kind === 'star' && ref.starId === `c${catalogueStar[1]}`
+            && !!this.universe.system(ref.starId).get(id);
+        }));
       });
       if (!savedJourney && !REACH_TRACE_FRESH) savedJourney = stored.state;
       this.reachCheckpointWritable = stored.canWrite;
@@ -295,13 +313,6 @@ class App implements UIHost {
       this.reachCountdown?.update(performance.now());
       this.reachOdometer?.update(performance.now());
       if (REACH_ALPHA_PREVIEW) {
-        for (const name of ['ALPHA A', 'ALPHA B']) {
-          const marker = document.createElement('div');
-          marker.className = 'reach-alpha-marker';
-          marker.textContent = name;
-          document.body.appendChild(marker);
-          this.alphaMarkers.push(marker);
-        }
         Object.defineProperty(window, '__reachAlphaStatus', {
           value: () => this.alphaPreviewStatus(), configurable: false,
         });
@@ -323,6 +334,17 @@ class App implements UIHost {
       this.reachCountdown = null;
       this.reachOdometer = null;
       this.showBackdrop(false);
+    }
+
+    if (REACH_MODE && !REACH_SURFACE_PREVIEW) {
+      for (const name of ['ALPHA A', 'ALPHA B']) {
+        const marker = document.createElement('div');
+        marker.className = 'reach-alpha-marker';
+        marker.textContent = name;
+        marker.hidden = true;
+        document.body.appendChild(marker);
+        this.alphaMarkers.push(marker);
+      }
     }
 
     if (!REACH_MODE) {
@@ -416,19 +438,26 @@ class App implements UIHost {
   }
 
   private updateAlphaMarkers(): void {
-    const status = this.alphaPreviewStatus() as {
-      stage: string; stars: { a: { x: number; y: number; visible: boolean },
-        b: { x: number; y: number; visible: boolean } } | null;
-    };
-    if (this.alphaDiagnostics) this.alphaDiagnostics.textContent = JSON.stringify(status);
-    const wide = ['establish', 'retract-a', 'cross-to-b', 'retract-b', 'final-overview'].includes(status.stage);
-    for (const [i, star] of [status.stars?.a, status.stars?.b].entries()) {
+    if (this.alphaDiagnostics) this.alphaDiagnostics.textContent = JSON.stringify(this.alphaPreviewStatus());
+    const cinematic = this.reach?.alphaCinematic;
+    const wide = !cinematic || ['establish', 'retract-a', 'cross-to-b', 'retract-b',
+      'final-overview'].includes(cinematic.stage);
+    const binary = this.universe.current.starId === ALPHA_SYSTEM_ID ? this.universe.current : null;
+    for (const [i, id] of [`s${ALPHA_A_INDEX}-star`, `s${ALPHA_B_INDEX}-star`].entries()) {
       const marker = this.alphaMarkers[i];
       if (!marker) continue;
-      marker.hidden = !wide || !star?.visible;
-      if (star) {
-        marker.style.left = `${star.x + 13}px`;
-        marker.style.top = `${star.y - 9}px`;
+      const body = binary?.get(id);
+      if (!body || !wide || (this.bodies.byId.get(id)?.apparentRadiusPx ?? 0) > 50) {
+        marker.hidden = true;
+        continue;
+      }
+      const direction = body.position.clone().sub(this.camera.position).normalize();
+      const projected = direction.multiplyScalar(1e11).project(this.engine.camera);
+      marker.hidden = projected.z < -1 || projected.z > 1
+        || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1;
+      if (!marker.hidden) {
+        marker.style.left = `${(projected.x + 1) * this.engine.width / 2 + 13}px`;
+        marker.style.top = `${(1 - projected.y) * this.engine.height / 2 - 9}px`;
       }
     }
   }
@@ -1431,9 +1460,16 @@ class App implements UIHost {
     this.surfacePreview?.render(this.bodies.byId.get('mars'), this.bodies.byId.get('perseverance'));
     const eligibleMeshes = this.arrivalTrace && this.universe.current.starId === 'c64548'
       ? this.bodies.views.filter((view) => view.meshVisible).map((view) => view.body.id).join(',') : '';
-    const hideGeneratedBodies = REACH_HIDE_ENCOUNTER_PLANETS
-      && this.universe.current.starId === REACH_STAR_ENCOUNTER_ID;
-    if (hideGeneratedBodies && !REACH_ALPHA_PREVIEW) {
+    const visualDestinationId = shared?.destinationId ?? this.reach?.countdown.destinationId;
+    const visualPhase = shared?.phase ?? this.reach?.countdown.phase;
+    const activeStop = REACH_ROUTE.stops.find((stop) => stop.id === visualDestinationId)
+      ?? REACH_ROUTE.stops[0];
+    const activeRef = activeStop ? destinationRef(activeStop) : null;
+    const productionSingleStar = REACH_MODE && !REACH_PREVIEW_ROUTE && !REACH_PILOT
+      && activeRef?.kind === 'star' && this.universe.current.starId === activeRef.starId;
+    const hideGeneratedBodies = (REACH_HIDE_ENCOUNTER_PLANETS
+      && this.universe.current.starId === REACH_STAR_ENCOUNTER_ID) || productionSingleStar;
+    if (hideGeneratedBodies && this.universe.current.starId !== ALPHA_SYSTEM_ID) {
       suppressProximaPlanetMeshes(this.bodies.views, star.id);
     }
     const bodiesMs = bodiesStarted ? performance.now() - bodiesStarted : 0;
@@ -1441,10 +1477,10 @@ class App implements UIHost {
     this.points.setPixelRatio(eng.pixelRatio);
     this.points.update(star.position, camPos, this.starLuminosity, hideGeneratedBodies);
     this.starPoints.setPixelRatio(eng.pixelRatio);
-    const nextStop = REACH_ROUTE.stops[this.reach?.countdown.routeIndex ?? 0];
+    const nextStop = activeStop;
     const nextRef = nextStop ? destinationRef(nextStop) : null;
     const starCruise = nextStop?.profile === 'star'
-      && this.reach?.countdown.phase === 'NEXT'
+      && visualPhase === 'NEXT'
       && nextRef?.kind === 'star'
       && this.universe.current.starId === nextRef.starId;
     const starView = this.bodies.byId.get(star.id);
@@ -1468,7 +1504,10 @@ class App implements UIHost {
     }
     if (starCruise && !REACH_NO_CORONA_BLEND && starView?.coronaMat)
       starView.coronaMat.uniforms.uIntensity.value *= starAppearance.coronaScale;
-    if (REACH_ALPHA_PREVIEW && this.universe.current.starId === ALPHA_SYSTEM_ID) {
+    const alphaEncounter = REACH_MODE && (REACH_ALPHA_PREVIEW
+      || this.universe.current.starId === ALPHA_SYSTEM_ID
+      || visualDestinationId === REACH_ALPHA_DESTINATION_ID);
+    if (alphaEncounter && this.universe.current.starId === ALPHA_SYSTEM_ID) {
       const aView = this.bodies.byId.get(`s${ALPHA_A_INDEX}-star`);
       const bView = this.bodies.byId.get(`s${ALPHA_B_INDEX}-star`);
       if (!aView || !bView) throw new Error('Alpha Centauri preview is missing a stellar renderer');
@@ -1492,7 +1531,7 @@ class App implements UIHost {
       }
       this.starPoints.update(this.camPc, -1, ALPHA_A_INDEX, aAppearance.pointOpacity, aView.relPos,
         { index: ALPHA_B_INDEX, opacity: bAppearance.pointOpacity, direction: bView.relPos });
-    } else if (REACH_ALPHA_PREVIEW) {
+    } else if (alphaEncounter) {
       const binary = this.universe.system(ALPHA_SYSTEM_ID);
       binary.update(this.time.jd, this.time.t);
       const a = binary.get(`s${ALPHA_A_INDEX}-star`)!;
@@ -1511,7 +1550,7 @@ class App implements UIHost {
     this.galaxySprites.update(this.camPc, pxPerRad, eng.pixelRatio, this.galaxyBoost, this.universe.currentGalaxy ?? -1);
     this.landmarkSprites.update(this.camPc, pxPerRad, this.universe.current.starId, (gi) => this.galaxySprites.apparent(gi).ratio);
     this.nebulaClouds.update(this.camPc, pxPerRad, eng.pixelRatio, this.landmarkSprites.k, this.landmarkSprites.mesh.visible);
-    if (REACH_ALPHA_PREVIEW) this.updateAlphaMarkers();
+    if (REACH_MODE) this.updateAlphaMarkers();
     // bottom-left credit: streamed planetary imagery first, otherwise a resolved landmark photograph
     if (this.bodies.imageryCredit) this.ui.setImageryCredit(this.bodies.imageryCredit);
     else {
@@ -1527,7 +1566,8 @@ class App implements UIHost {
       sp.update(this.camPc, pxPerRad, eng.pixelRatio, this.galaxyBoost, -1);
     });
     const orbitStarted = this.arrivalTrace ? performance.now() : 0;
-    this.orbits.update(camPos, !hideGeneratedBodies
+    this.orbits.update(camPos, !(REACH_MODE && this.universe.current.starId === ALPHA_SYSTEM_ID)
+      && !hideGeneratedBodies
       && (ov.orbits ?? (s.orbits || this.backdrop || this.backdropPending)),
       ov.moonOrbits ?? s.moonOrbits, pxPerRad, (id) => this.bodies.byId.get(id)?.apparentRadiusPx ?? 0, this.selected?.id ?? null);
     const orbitMs = orbitStarted ? performance.now() - orbitStarted : 0;
@@ -1683,7 +1723,12 @@ async function boot(): Promise<void> {
     if (loaderText && !REACH_MODE) loaderText.textContent = _('Yıldız kataloğu yükleniyor…');
     const catalog = await StarCatalog.load(import.meta.env.BASE_URL);
     if (loaderText && !REACH_MODE) loaderText.textContent = _('Evren hazırlanıyor…');
-    const diagnosticJourney = REACH_FLICKER
+    const diagnosticJourney = REACH_INSPECT_ID
+      ? await fetch(`/validation/reach-v4/${REACH_INSPECT_ID}.json`).then((response) => {
+        if (!response.ok) throw new Error(`Reach inspection checkpoint HTTP ${response.status}`);
+        return response.json() as Promise<ReachJourneyState>;
+      })
+      : REACH_FLICKER
       ? await fetch('/validation/flicker/halley-to-sun-110s.json').then((response) => {
         if (!response.ok) throw new Error(`Diagnostic checkpoint HTTP ${response.status}`);
         return response.json() as Promise<ReachJourneyState>;

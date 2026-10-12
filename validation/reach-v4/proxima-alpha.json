@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "itinerary": {
+    "id": "solar-system-41",
+    "version": 4
+  },
+  "destinationId": "star:c64548",
+  "routeIndex": 47,
+  "direction": "outbound",
+  "cycleItineraryVersion": 4,
+  "phase": {
+    "kind": "departure",
+    "sourceId": "s64548-star",
+    "nextId": "alpha-centauri-ab",
+    "offset": [
+      93622.41171942414,
+      217176.39710242263,
+      -154141.1106303397
+    ],
+    "orientation": [
+      0.5521960825435543,
+      0.68417405813359,
+      0.45890928231703126,
+      -0.12801412111105098
+    ],
+    "up": [
+      0.8730902062496243,
+      -0.0310364859463612,
+      0.48656985962047605
+    ],
+    "orbitRate": 0.012,
+    "radialSpeed": 0,
+    "endRadius": 12185377.211709779,
+    "elapsed": 0,
+    "duration": 10
+  },
+  "simulation": {
+    "jd": 2461323.525451251,
+    "rate": 1
+  },
+  "frame": {
+    "starId": "c64548"
+  },
+  "odometer": {
+    "completedKm": 40176487302768.875,
+    "roundTrips": 0,
+    "leg": {
+      "fromId": "star:c64548",
+      "toId": "alpha-centauri-ab",
+      "departureJd": 2461323.525451251,
+      "distanceKm": 1777984520428.074
+    }
+  },
+  "camera": {
+    "position": [
+      93622.41171942414,
+      217176.39710242263,
+      -154141.1106303397
+    ],
+    "orientation": [
+      0.5521960825435543,
+      0.68417405813359,
+      0.45890928231703126,
+      -0.12801412111105098
+    ],
+    "referenceId": "s64548-star",
+    "targetId": "s64548-star",
+    "autoOrbit": 0,
+    "flight": null
+  }
+}

@@ -8,6 +8,7 @@ import { StarSystem } from '../core/StarSystem';
 import type { StarCatalog } from '../data/StarCatalog';
 import type { BodyData, SimpleElements } from '../data/types';
 import { basisFromPole, raDecToScene } from '../math/frames';
+import type { JourneyPhase, Vec3 } from './JourneyState';
 
 export const ALPHA_A_INDEX = 65262;
 export const ALPHA_B_INDEX = 65259;
@@ -16,7 +17,7 @@ export const ALPHA_BARY_ID = 'alpha-centauri-ab-bary';
 
 // Pourbaix et al. (2002), A&A 386, 280: relative visual orbit.
 // The catalogue puts the pair near 4.320 LY; the measured parallax gives about 4.37 LY.
-// Keep the catalogue position for this isolated preview and model the relative orbit here.
+// Keep the catalogue position and model the relative orbit here.
 export const ALPHA_ORBIT = {
   periodYears: 79.91, semimajorAu: 23.4, eccentricity: 0.5179,
   inclinationDeg: 79.205, nodePositionAngleDeg: 204.85,
@@ -88,10 +89,15 @@ const ALPHA_SHOTS: readonly { stage: AlphaCinematicStage; seconds: number; label
   { stage: 'retract-b', seconds: 10, label: 'PULL BACK FROM B' },
   { stage: 'final-overview', seconds: 10, label: 'BINARY OVERVIEW' },
 ];
+export function alphaShotSeconds(stage: string): number | null {
+  return ALPHA_SHOTS.find((shot) => shot.stage === stage)?.seconds ?? null;
+}
+export type ReachBinaryPhase = Extract<JourneyPhase, { kind: 'binary' }>;
+const vec = (v: Vector3): Vec3 => [v.x, v.y, v.z];
 
 const ease = (t: number): number => { const u = Math.min(1, Math.max(0, t)); return u * u * (3 - 2 * u); };
 
-/** Development-only local shot path. Every waypoint uses the same barycentric km frame. */
+/** Local shot path. Every waypoint uses the same barycentric km frame. */
 export class ReachAlphaCinematic {
   private shot = 0;
   private elapsed = 0;
@@ -104,14 +110,25 @@ export class ReachAlphaCinematic {
   private readonly aim = new Vector3();
 
   constructor(private readonly camera: CameraController, readonly barycenter: CelestialBody,
-    readonly a: CelestialBody, readonly b: CelestialBody, readonly observationRadii: number) {
+    readonly a: CelestialBody, readonly b: CelestialBody, readonly observationRadii: number,
+    saved?: ReachBinaryPhase) {
+    if (saved) {
+      this.shot = ALPHA_SHOTS.findIndex((candidate) => candidate.stage === saved.shot);
+      if (this.shot < 0) throw new Error('Unknown Alpha cinematic shot');
+      this.elapsed = saved.elapsed;
+      this.entryPosition = new Vector3().fromArray(saved.entryPosition);
+      this.entryTarget = new Vector3().fromArray(saved.entryTarget);
+      this.side = new Vector3().fromArray(saved.side);
+      this.up = new Vector3().fromArray(saved.up);
+      return;
+    }
     this.entryPosition = camera.position.clone();
     this.entryTarget = barycenter.position.clone();
     const axis = b.position.clone().sub(a.position).normalize();
     const incoming = camera.position.clone().sub(barycenter.position);
     this.side = incoming.clone().addScaledVector(axis, -incoming.dot(axis)).normalize();
     if (this.side.lengthSq() < 0.5) this.side.copy(camera.position).sub(barycenter.position).normalize();
-    this.up = new Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    this.up = new Vector3(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
     camera.autopilot = null;
     camera.autoOrbit = 0;
     camera.setReference(barycenter);
@@ -124,6 +141,11 @@ export class ReachAlphaCinematic {
   get secondsLeft(): number { return this.terminal ? 0 : ALPHA_SHOTS[this.shot].seconds - this.elapsed; }
   get terminal(): boolean { return this.shot === ALPHA_SHOTS.length - 1 && this.elapsed >= ALPHA_SHOTS[this.shot].seconds; }
   get target(): Vector3 { return this.aim.clone(); }
+  capture(): ReachBinaryPhase {
+    return { kind: 'binary', shot: this.stage, elapsed: this.elapsed,
+      duration: ALPHA_SHOTS[this.shot].seconds, entryPosition: vec(this.entryPosition),
+      entryTarget: vec(this.entryTarget), side: vec(this.side), up: vec(this.up) };
+  }
 
   update(dt: number): boolean {
     if (this.terminal) return false;

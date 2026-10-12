@@ -8,7 +8,7 @@ import type { Universe } from '../core/Universe';
 import { SOLAR_SYSTEM } from '../data/solarSystem';
 import {
   REACH_ITINERARY_ID, REACH_ITINERARY_VERSION,
-  previousReachStopId,
+  previousReachStopId, reachStopIdsForVersion, V4_STOP_IDS, type ReachDirection,
   type JourneyPhase, type Quat, type ReachFlightState, type ReachJourneyState, type Vec3,
 } from './JourneyState';
 import { ReachTiming } from './ReachTiming';
@@ -17,9 +17,15 @@ import { destinationRef, destinationSystem, REACH_NEARBY_OBSERVATION_RADII,
   REACH_NEARBY_STAR_PREVIEWS, REACH_PROXIMA_PILOT, REACH_ALPHA_CENTAURI_PREVIEW,
   type ReachRoute, type ReachStop } from './ReachDestinations';
 import { reachArrivalTraceEnabled } from './ReachArrivalTrace';
-import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, ReachAlphaCinematic } from './ReachAlphaCentauri';
+import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, ALPHA_SYSTEM_ID, ReachAlphaCinematic } from './ReachAlphaCentauri';
 
 type Stop = ReachStop;
+export const REACH_ALPHA_DESTINATION_ID = 'alpha-centauri-ab';
+const nearbyStar = (id: string, starId: string, label: string): Stop => ({
+  id, profile: 'star', label, ref: { kind: 'star', starId },
+  starPresentation: { observationDistanceRadii: REACH_NEARBY_OBSERVATION_RADII,
+    surfaceMotion: 0.6, coronaMotion: 0.2, colorWarmth: 0 },
+});
 
 // Route order and presentation profile only. Durations come from ReachTiming.
 export const REACH_ITINERARY: readonly Stop[] = [
@@ -70,7 +76,21 @@ export const REACH_ITINERARY: readonly Stop[] = [
   { id: 'pioneer10', profile: 'probe' },
   { id: 'voyager2', profile: 'probe' },
   { id: 'voyager1', profile: 'probe' },
+  REACH_PROXIMA_PILOT.stops[1],
+  { id: REACH_ALPHA_DESTINATION_ID, profile: 'star', label: 'Alpha Centauri A/B',
+    ref: { kind: 'body', systemId: ALPHA_SYSTEM_ID, bodyId: ALPHA_BARY_ID }, binaryOverview: true },
+  nearbyStar('star:c80155', 'c80155', "Barnard's Star"),
+  nearbyStar('star:c108500', 'c108500', 'Wolf 359'),
+  nearbyStar('star:c49269', 'c49269', 'Lalande 21185'),
+  nearbyStar('star:c29786', 'c29786', 'Sirius A'),
+  nearbyStar('star:c109365', 'c109365', 'Ross 248'),
+  nearbyStar('star:c15247', 'c15247', 'Epsilon Eridani'),
+  nearbyStar('star:c7458', 'c7458', 'Tau Ceti'),
+  nearbyStar('star:c83130', 'c83130', 'Vega'),
 ];
+if (REACH_ITINERARY.length !== 57 || new Set(REACH_ITINERARY.map((stop) => stop.id)).size !== 57
+  || REACH_ITINERARY.some((stop, index) => stop.id !== V4_STOP_IDS[index]))
+  throw new Error('Reach v4 itinerary identity or order mismatch');
 
 export const REACH_PRODUCTION_ROUTE: ReachRoute = {
   id: REACH_ITINERARY_ID, version: REACH_ITINERARY_VERSION, stops: REACH_ITINERARY, repeat: true,
@@ -120,7 +140,9 @@ export class ReachVoyageDirector {
   private observeDuration = 0;
   private completedKm = 0;
   private roundTripCount = 0;
-  private transitionFromVersion: 1 | 2 | null = null;
+  private direction: ReachDirection = 'outbound';
+  private cycleItineraryVersion = REACH_ITINERARY_VERSION;
+  private transitionFromVersion: number | null = null;
   private leg: ReachDistanceLeg | null = null;
   private flyby: {
     body: CelestialBody; offset: Vector3; orientation: Quaternion; up: Vector3;
@@ -134,7 +156,7 @@ export class ReachVoyageDirector {
   private alpha: ReachAlphaCinematic | null = null;
 
   get directing(): boolean { return !!this.alpha || this.stage === 'departure' || this.stage === 'flyby'; }
-  get alphaPreview(): boolean { return import.meta.env?.DEV !== false && this.route.id === 'preview:alpha-centauri'; }
+  get alphaPreview(): boolean { return this.route.id === 'preview:alpha-centauri'; }
   get alphaCinematic(): ReachAlphaCinematic | null { return this.alpha; }
   get roundTrips(): number { return this.roundTripCount; }
   get countdownLabel(): string {
@@ -194,7 +216,9 @@ export class ReachVoyageDirector {
     if (!c.reference || !c.target) throw new Error('Reach camera has no reference or target');
     let phase: JourneyPhase;
     let flight: ReachFlightState | null = null;
-    if (this.stage === 'observe') {
+    if (this.alpha && this.route.id === REACH_ITINERARY_ID) {
+      phase = this.alpha.capture();
+    } else if (this.stage === 'observe') {
       phase = { kind: 'observe', elapsed: this.observeDuration - this.observeLeft, duration: this.observeDuration };
     } else if (this.stage === 'flyby') {
       const f = this.flyby!;
@@ -217,7 +241,8 @@ export class ReachVoyageDirector {
     }
     return {
       schema: 1, itinerary: { id: this.route.id, version: this.route.version },
-      destinationId: current.id, routeIndex: this.stop, phase,
+      destinationId: current.id, routeIndex: this.stop, direction: this.direction,
+      cycleItineraryVersion: this.cycleItineraryVersion, phase,
       ...(this.transitionFromVersion && (this.stage === 'departure' || this.stage === 'cruise')
         ? { transitionFromVersion: this.transitionFromVersion } : {}),
       simulation: { jd: this.time.jd, rate: this.time.rate },
@@ -233,13 +258,16 @@ export class ReachVoyageDirector {
     this.stop = this.stops.findIndex((stop) => stop.id === saved.destinationId);
     this.completedKm = saved.odometer?.completedKm ?? 0;
     this.roundTripCount = saved.odometer?.roundTrips ?? 0;
+    this.direction = saved.direction;
+    this.cycleItineraryVersion = saved.cycleItineraryVersion;
     this.transitionFromVersion = saved.transitionFromVersion ?? null;
     this.leg = saved.odometer?.leg ? { ...saved.odometer.leg } : null;
     if (!saved.odometer && (saved.phase.kind === 'departure' || saved.phase.kind === 'cruise')) {
       const fromId = saved.phase.kind === 'departure' ? saved.destinationId
         : (this.transitionFromVersion
           ? previousReachStopId(this.transitionFromVersion, saved.destinationId)
-          : this.stops[(this.stop - 1 + this.stops.length) % this.stops.length].id)!;
+          : this.stops[(this.stop + (this.direction === 'inbound' ? 1 : -1)
+            + this.stops.length) % this.stops.length].id)!;
       const toId = saved.phase.kind === 'departure' ? saved.phase.nextId : saved.destinationId;
       this.leg = this.makeLeg(fromId, toId);
     }
@@ -264,7 +292,7 @@ export class ReachVoyageDirector {
     } : null;
 
     const phase = saved.phase;
-    this.stage = phase.kind;
+    this.stage = phase.kind === 'binary' ? 'observe' : phase.kind;
     if (phase.kind === 'observe') {
       this.observeDuration = phase.duration;
       this.observeLeft = phase.duration - phase.elapsed;
@@ -279,6 +307,11 @@ export class ReachVoyageDirector {
         orientation: new Quaternion().fromArray(phase.orientation), up: new Vector3().fromArray(phase.up),
         orbitRate: phase.orbitRate, radialSpeed: phase.radialSpeed, endRadius: phase.endRadius,
         elapsed: phase.elapsed, duration: phase.duration };
+    } else if (phase.kind === 'binary') {
+      this.alpha = new ReachAlphaCinematic(c, this.body(ALPHA_BARY_ID),
+        this.body(`s${ALPHA_A_INDEX}-star`), this.body(`s${ALPHA_B_INDEX}-star`),
+        REACH_NEARBY_OBSERVATION_RADII, phase);
+      this.stage = 'observe';
     }
   }
 
@@ -286,9 +319,15 @@ export class ReachVoyageDirector {
     if (paused) return;
     if (this.alpha) {
       if (this.alpha.update(dt)) {
-        const shot = this.alpha.stage;
-        this.stop = shot.endsWith('-a') ? 2 : shot.endsWith('-b') || shot === 'cross-to-b' ? 3 : 4;
+        if (this.route.id === 'preview:alpha-centauri') {
+          const shot = this.alpha.stage;
+          this.stop = shot.endsWith('-a') ? 2 : shot.endsWith('-b') || shot === 'cross-to-b' ? 3 : 4;
+        }
         this.onPhaseChange?.();
+      }
+      if (this.alpha.terminal && this.route.repeat) {
+        this.alpha = null;
+        this.beginDeparture(0, 0);
       }
       return;
     }
@@ -300,14 +339,27 @@ export class ReachVoyageDirector {
         this.completedKm += this.leg.distanceKm;
         this.leg = null;
       }
+      const preRoundTripArrival = this.transitionFromVersion !== null
+        && this.transitionFromVersion < 4;
+      if (this.route.id === REACH_ITINERARY_ID && this.route.version >= 4) {
+        if (this.stop === this.stops.length - 1 && this.direction === 'outbound') {
+          this.direction = 'inbound';
+          this.cycleItineraryVersion = this.route.version;
+        } else if (this.stops[this.stop].id === 'earth' && this.direction === 'inbound') {
+          if (!preRoundTripArrival) this.roundTripCount++;
+          this.direction = 'outbound';
+          this.cycleItineraryVersion = this.route.version;
+        }
+      }
       this.transitionFromVersion = null;
       const stop = this.stops[this.stop];
-      if (import.meta.env?.DEV !== false && this.route.id === 'preview:alpha-centauri' && stop.id === 'alpha:establish') {
+      if (stop.binaryOverview && (stop.id === REACH_ALPHA_DESTINATION_ID
+        || this.route.id === 'preview:alpha-centauri' && stop.id === 'alpha:establish')) {
         const barycenter = this.body(ALPHA_BARY_ID);
         const a = this.body(`s${ALPHA_A_INDEX}-star`);
         const b = this.body(`s${ALPHA_B_INDEX}-star`);
         this.alpha = new ReachAlphaCinematic(this.camera, barycenter, a, b,
-          this.stops[2].starPresentation!.observationDistanceRadii);
+          REACH_NEARBY_OBSERVATION_RADII);
         this.stage = 'observe';
         this.observeDuration = this.alpha.secondsLeft;
         this.observeLeft = this.observeDuration;
@@ -353,7 +405,9 @@ export class ReachVoyageDirector {
   private beginDeparture(radialSpeed: number, orbitRate: number): void {
     this.transitionFromVersion = null;
     const source = this.destination(this.stops[this.stop]);
-    const next = (this.stop + 1) % this.stops.length;
+    const nextId = this.nextDestinationId();
+    const next = this.stops.findIndex((stop) => stop.id === nextId);
+    if (next < 0) throw new Error(`Reach route no longer resolves ${nextId}`);
     this.leg = this.makeLeg(this.stops[this.stop].id, this.stops[next].id);
     const offset = new Vector3().subVectors(this.camera.position, source.position);
     const isMoon = this.stops[this.stop].profile === 'moon';
@@ -370,6 +424,18 @@ export class ReachVoyageDirector {
     this.camera.autoOrbit = 0;
     this.stage = 'departure';
     this.onPhaseChange?.();
+  }
+
+  private nextDestinationId(): string {
+    if (!this.route.repeat || this.route.id !== REACH_ITINERARY_ID
+      || this.route.version < 4)
+      return this.stops[(this.stop + 1) % this.stops.length].id;
+    const ids = this.direction === 'inbound' && this.cycleItineraryVersion !== this.route.version
+      ? reachStopIdsForVersion(this.cycleItineraryVersion) : this.stops.map((stop) => stop.id);
+    if (!ids) throw new Error('Reach return itinerary is unavailable');
+    const index = ids.indexOf(this.stops[this.stop].id);
+    if (index < 0) throw new Error('Reach current stop is absent from its cycle');
+    return ids[index + (this.direction === 'inbound' ? -1 : 1)]!;
   }
 
   private updateDeparture(dt: number): void {

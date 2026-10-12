@@ -407,7 +407,7 @@ const nearbyIds = {
   barnard: 80155, 'wolf-359': 108500, 'lalande-21185': 49269, sirius: 29786,
   'ross-248': 109365, 'epsilon-eridani': 15247, 'tau-ceti': 7458, vega: 83130,
 };
-assert.equal(REACH_PRODUCTION_ROUTE.stops.length, 47);
+assert.equal(REACH_PRODUCTION_ROUTE.stops.length, 57);
 assert.deepEqual(Object.keys(REACH_NEARBY_STAR_PREVIEWS), Object.keys(nearbyIds));
 const temperatures = new Set();
 const radii = new Set();
