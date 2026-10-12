@@ -7,6 +7,24 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#090b0f" />
+    <script>
+      if (new URLSearchParams(location.search).get('reach') === '1') {
+        document.documentElement.classList.add('reach-mode');
+        const showStartupError = (event) => {
+          if (document.getElementById('loader')?.classList.contains('done')) return;
+          if (event.type === 'error' && !(event instanceof ErrorEvent) && !(event.target instanceof HTMLScriptElement)) return;
+          const text = document.querySelector('#loader .loader-text');
+          if (text) text.textContent = 'The Reach could not start. Check the application log for details.';
+          document.documentElement.classList.add('reach-load-error');
+        };
+        window.addEventListener('error', showStartupError, true);
+        window.addEventListener('unhandledrejection', showStartupError);
+      }
+    </script>
+    <style>
+      html.reach-mode #loader .loader-text { visibility: hidden; }
+      html.reach-mode.reach-load-error #loader .loader-text { visibility: visible; }
+    </style>
     <!-- Static head text is English for crawlers / link previews (no JS); applyDom() rewrites it
          per locale at runtime using the Turkish source key in data-i18n-content. -->
     <title>Your Eyes In Space — Explore the observable universe in your browser</title>

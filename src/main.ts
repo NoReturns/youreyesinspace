@@ -1472,9 +1472,9 @@ async function boot(): Promise<void> {
     await initI18n();
     applyDom();
     document.title = REACH_MODE ? 'The Reach Screensaver' : _('Your Eyes In Space — Gözlemlenebilir evreni tarayıcıda gez');
-    if (loaderText) loaderText.textContent = _('Yıldız kataloğu yükleniyor…');
+    if (loaderText && !REACH_MODE) loaderText.textContent = _('Yıldız kataloğu yükleniyor…');
     const catalog = await StarCatalog.load(import.meta.env.BASE_URL);
-    if (loaderText) loaderText.textContent = _('Evren hazırlanıyor…');
+    if (loaderText && !REACH_MODE) loaderText.textContent = _('Evren hazırlanıyor…');
     const diagnosticJourney = REACH_FLICKER
       ? await fetch('/validation/flicker/halley-to-sun-110s.json').then((response) => {
         if (!response.ok) throw new Error(`Diagnostic checkpoint HTTP ${response.status}`);
@@ -1486,7 +1486,10 @@ async function boot(): Promise<void> {
     if (!REACH_MODE) (window as unknown as { yeits: App }).yeits = app;
   } catch (err) {
     console.error(err);
-    if (loaderText) loaderText.textContent = `${_('Yükleme hatası')}: ${(err as Error).message}`;
+    if (REACH_MODE) document.documentElement.classList.add('reach-load-error');
+    if (loaderText) loaderText.textContent = REACH_MODE
+      ? `The Reach could not start: ${err instanceof Error ? err.message : String(err)}`
+      : `${_('Yükleme hatası')}: ${(err as Error).message}`;
   }
 }
 

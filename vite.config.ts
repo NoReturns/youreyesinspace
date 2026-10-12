@@ -31,6 +31,12 @@ export default defineConfig({
       for (const name of ['logo.png', 'logo-white.png', 'favicon.png', 'apple-touch-icon.png', 'og-image.jpg']) {
         rmSync(resolve(reachOutputDir, name), { force: true });
       }
+      for (const name of ['tours', 'tour-media']) {
+        rmSync(resolve(reachOutputDir, name), { recursive: true, force: true });
+      }
+      for (const name of ['dawn.glb', 'galileo.glb']) {
+        rmSync(resolve(reachOutputDir, 'models', name), { force: true });
+      }
     },
   }] : [],
   server: {

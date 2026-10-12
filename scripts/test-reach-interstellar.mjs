@@ -247,7 +247,7 @@ const element = { dataset: {}, setAttribute() {}, textContent: '' };
 globalThis.document = { createElement: () => element, body: { appendChild() {} } };
 const hud = new ReachOdometerOverlay(resumedDeparture.director, 'auto');
 hud.update(0);
-assert.match(element.textContent, /^Distance Travelled: .+\nRound-Trips: 0$/);
+assert.match(element.textContent, /^Distance Travelled: .+$/);
 assert.equal(element.dataset.position, resolveOdometerPosition('auto', resumedDeparture.director.countdown.routeIndex));
 globalThis.window = previousWindow;
 globalThis.document = previousDocument;

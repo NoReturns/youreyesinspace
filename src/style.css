@@ -47,6 +47,7 @@ body { position: fixed; inset: 0; }
 body.reach-mode, body.reach-mode * { cursor: none !important; }
 body.reach-mode #ui { display: none; }
 html.reach-panorama #ui, html.reach-panorama #loader { display: none !important; }
+html.reach-panorama.reach-load-error #loader { display: grid !important; }
 
 #reach-countdown, #reach-odometer {
   position: fixed;
