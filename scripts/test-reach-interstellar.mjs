@@ -7,13 +7,18 @@ import * as THREE from 'three';
 const entry = `
   export { ReachVoyageDirector, reachPreviewRoute } from './src/reach/ReachVoyageDirector.ts';
   export { REACH_PROXIMA_PILOT, reachPilotStarBlend, reachPilotStarHideIndex, reachStarVisualDrift,
-    reachPilotStarAppearance } from './src/reach/ReachDestinations.ts';
+    reachPilotStarAppearance, REACH_NEARBY_STAR_PREVIEWS, REACH_NEARBY_OBSERVATION_RADII
+  } from './src/reach/ReachDestinations.ts';
+  export { REACH_PRODUCTION_ROUTE } from './src/reach/ReachVoyageDirector.ts';
   export { CameraController } from './src/camera/CameraController.ts';
   export { TimeSystem } from './src/core/TimeSystem.ts';
   export { Universe } from './src/core/Universe.ts';
   export { StarCatalog } from './src/data/StarCatalog.ts';
   export { StarPoints } from './src/render/StarPoints.ts';
   export { BodyPoints } from './src/render/BodyPoints.ts';
+  export { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_SYSTEM_ID, ALPHA_BARY_ID, ALPHA_ORBIT,
+    createAlphaCentauriPreviewSystem, alphaPointDirection }
+    from './src/reach/ReachAlphaCentauri.ts';
   export { ReachTiming, REACH_TIMING } from './src/reach/ReachTiming.ts';
   export { ReachOdometerOverlay, readOdometerContract, formatVoyageDistance, resolveOdometerPosition } from './src/reach/ReachOdometer.ts';
   export { readCountdownContract } from './src/reach/ReachCountdownOverlay.ts';
@@ -25,6 +30,7 @@ const entry = `
 `;
 const bundle = await rolldown({
   input: '\0reach-interstellar-test',
+  transform: { define: { 'import.meta.env.DEV': 'true' } },
   external: (id) => id === 'three' || id.includes('i18n'),
   plugins: [{
     name: 'reach-interstellar-test',
@@ -43,10 +49,13 @@ const module = { exports: {} };
 new Function('require', 'module', 'exports', output.output[0].code)(
   (id) => id === 'three' ? THREE : { _: (text) => text, fixed: String, localeTag: () => 'en' }, module, module.exports,
 );
-const { ReachVoyageDirector, reachPreviewRoute, REACH_PROXIMA_PILOT, reachPilotStarBlend, reachPilotStarHideIndex,
+const { ReachVoyageDirector, reachPreviewRoute, REACH_PRODUCTION_ROUTE, REACH_PROXIMA_PILOT,
+  REACH_NEARBY_STAR_PREVIEWS, REACH_NEARBY_OBSERVATION_RADII, reachPilotStarBlend, reachPilotStarHideIndex,
   reachStarVisualDrift,
   reachPilotStarAppearance, CameraController, TimeSystem,
-  Universe, StarCatalog, StarPoints, BodyPoints, ReachTiming, REACH_TIMING, ReachOdometerOverlay, readOdometerContract,
+  Universe, StarCatalog, StarPoints, BodyPoints, ALPHA_A_INDEX, ALPHA_B_INDEX,
+  ALPHA_SYSTEM_ID, ALPHA_BARY_ID, ALPHA_ORBIT, createAlphaCentauriPreviewSystem, alphaPointDirection,
+  ReachTiming, REACH_TIMING, ReachOdometerOverlay, readOdometerContract,
   formatVoyageDistance, resolveOdometerPosition, readCountdownContract,
   parseReachJourney, PARSEC_KM, ReachArrivalTrace,
   suppressProximaPlanetMeshes, preparePlanetResources } = module.exports;
@@ -203,7 +212,8 @@ const input = { flush: () => ({ dx: 0, dy: 0, wheel: 0, pinch: 0, panX: 0, panY:
 function makeRun(saved = null, route = pilot, timingMode = 'test') {
   const time = new TimeSystem(new Date('2026-10-10T00:00:00Z'));
   if (saved) { time.setRate(saved.simulation.rate); time.jd = saved.simulation.jd; }
-  const universe = new Universe(catalog);
+  const universe = new Universe(catalog, route.id === 'preview:alpha-centauri'
+    ? createAlphaCentauriPreviewSystem(catalog) : null);
   if (saved && saved.frame.starId !== 'c0') universe.switchTo(saved.frame.starId, time.jd, time.t);
   universe.update(time.jd, time.t);
   const camera = new CameraController(universe);
@@ -331,7 +341,7 @@ const preview = reachPreviewRoute('proxima');
 assert.ok(preview && preview !== pilot && preview.stops === pilot.stops);
 assert.equal(preview.id, 'preview:proxima');
 assert.equal(preview.repeat, false);
-assert.equal(reachPreviewRoute('alpha-centauri'), null);
+assert.equal(reachPreviewRoute('alpha-centauri')?.id, 'preview:alpha-centauri');
 const shortRun = makeRun(null, preview, 'preview');
 const shortDeparture = until(shortRun, (s) => s.phase.kind === 'departure');
 assert.equal(shortDeparture.phase.duration, 2);
@@ -393,5 +403,224 @@ for (let i = 0; i < 100; i++) {
 assert.equal(shortRun.director.capture().destinationId, 'star:c64548', 'the preview stops after observation');
 assert.equal(shortRun.director.capture().odometer.leg, null);
 assert.equal(shortRun.director.roundTrips, 0);
+const nearbyIds = {
+  barnard: 80155, 'wolf-359': 108500, 'lalande-21185': 49269, sirius: 29786,
+  'ross-248': 109365, 'epsilon-eridani': 15247, 'tau-ceti': 7458, vega: 83130,
+};
+assert.equal(REACH_PRODUCTION_ROUTE.stops.length, 47);
+assert.deepEqual(Object.keys(REACH_NEARBY_STAR_PREVIEWS), Object.keys(nearbyIds));
+const temperatures = new Set();
+const radii = new Set();
+for (const [name, index] of Object.entries(nearbyIds)) {
+  const starId = `c${index}`;
+  const route = reachPreviewRoute(name);
+  assert.equal(route?.id, `preview:${name}`);
+  assert.equal(route.repeat, false);
+  assert.deepEqual(route.stops.map((stop) => stop.id), ['earth', `star:${starId}`]);
+  assert.deepEqual(route.stops[1].ref, { kind: 'star', starId });
+  assert.equal(route.stops[1].starPresentation.observationDistanceRadii, REACH_NEARBY_OBSERVATION_RADII);
+  const info = catalog.info(index);
+  assert.ok(info.radiusKm > 0 && info.temperature > 0, `${name} has physical catalogue parameters`);
+  temperatures.add(Math.round(info.temperature));
+  radii.add(Math.round(info.radiusKm));
+  const run = makeRun(null, route, 'preview');
+  const system = run.universe.system(starId);
+  const star = system.star;
+  if (name === 'sirius') {
+    assert.equal(route.stops[1].label, 'Sirius A');
+    assert.equal(system.bodies.filter((body) => body.data.type === 'star').length, 1,
+      'the Sirius preview resolves only the catalogue primary');
+  }
+  assert.ok(Math.abs(star.radius - info.radiusKm) / info.radiusKm < 1e-12,
+    `${name} uses its catalogue radius`);
+  assert.equal(star.data.temperature, info.temperature, `${name} uses its catalogue temperature`);
+  const departure = until(run, (s) => s.phase.kind === 'departure');
+  assert.equal(departure.odometer.leg.toId, `star:${starId}`);
+  const cruise = until(run, (s) => s.phase.kind === 'cruise');
+  assert.equal(cruise.frame.starId, starId);
+  assert.equal(cruise.camera.referenceId, star.id);
+  assert.equal(run.camera.autopilot.dist1, star.radius * REACH_NEARBY_OBSERVATION_RADII);
+  assert.ok(run.camera.position.distanceTo(star.position) > star.radius * 4.5,
+    `${name} frame handoff clears the corona`);
+  const appearance = reachPilotStarAppearance(index, 0.82, true, false);
+  assert.equal(appearance.targetIndex, index);
+  assert.ok(appearance.pointOpacity > 0 && appearance.pointOpacity < 1);
+  assert.equal(appearance.pointOpacity + appearance.discScale, 1);
+  const arrival = until(run, (s) => s.phase.kind === 'observe' && s.destinationId === `star:${starId}`);
+  const distanceRadii = run.camera.position.distanceTo(star.position) / star.radius;
+  assert.ok(Math.abs(distanceRadii - REACH_NEARBY_OBSERVATION_RADII) < 0.01);
+  assert.ok(distanceRadii > 4.5, `${name} observation clears the corona`);
+  assert.equal(run.director.terminalObservation, true);
+  assert.equal(run.director.countdownLabel, REACH_NEARBY_STAR_PREVIEWS[name][1]);
+  assert.equal(parseReachJourney(JSON.stringify(arrival), REACH_PRODUCTION_ROUTE,
+    hasDestination(run.universe)), null, `${name} preview is not a production checkpoint`);
+  for (let i = 0; i < 70; i++) step(run);
+  assert.equal(run.director.capture().destinationId, `star:${starId}`);
+}
+assert.ok(temperatures.size >= 4 && radii.size >= 4, 'the previews retain distinct stellar physics');
+const nearbyDiscFraction = 1 / (Math.sqrt(REACH_NEARBY_OBSERVATION_RADII ** 2 - 1)
+  * Math.tan(50 * Math.PI / 360));
+assert.ok(Math.abs(nearbyDiscFraction - 0.30) < 0.005);
+assert.equal(reachPreviewRoute('alpha-centauri-a'), null);
+assert.equal(reachPreviewRoute('alpha-centauri-b'), null);
+assert.equal(reachPreviewRoute('toString'), null);
+const binaryRoute = reachPreviewRoute('alpha-centauri');
+assert.deepEqual(binaryRoute.stops.map((stop) => stop.id),
+  ['earth', 'alpha:establish', 'alpha:a', 'alpha:b', 'alpha:departure']);
+assert.equal(binaryRoute.repeat, false);
+assert.equal(ALPHA_A_INDEX, 65262);
+assert.equal(ALPHA_B_INDEX, 65259);
+assert.match(catalog.nameOf(ALPHA_A_INDEX), /Rigil Kentaurus/);
+assert.match(catalog.nameOf(ALPHA_B_INDEX), /Toliman/);
+assert.equal(ALPHA_ORBIT.periodYears, 79.91);
+const binaryRun = makeRun(null, binaryRoute, 'preview');
+const binary = binaryRun.universe.system(ALPHA_SYSTEM_ID);
+assert.equal(binary.starId, ALPHA_SYSTEM_ID);
+assert.equal(binary.roots.length, 1);
+assert.equal(binary.roots[0].id, ALPHA_BARY_ID);
+assert.deepEqual(binary.bodies.map((body) => body.data.type), ['barycenter', 'star', 'star']);
+const alphaA = binary.get(`s${ALPHA_A_INDEX}-star`);
+const alphaB = binary.get(`s${ALPHA_B_INDEX}-star`);
+assert.equal(alphaA.parent, binary.roots[0]);
+assert.equal(alphaB.parent, binary.roots[0]);
+assert.ok(alphaA.radius > alphaB.radius && alphaA.data.temperature > alphaB.data.temperature);
+assert.ok(alphaA.data.mass > alphaB.data.mass);
+const epochJd = binaryRun.time.jd;
+for (const years of [0, 20, 40, 79.91]) {
+  binary.update(epochJd + years * 365.25, 0);
+  const separationAu = alphaA.position.distanceTo(alphaB.position) / 149_597_870.7;
+  assert.ok(separationAu >= 11 && separationAu <= 36, `binary separation ${separationAu} AU`);
+  const center = alphaA.position.clone().multiplyScalar(alphaA.data.mass)
+    .addScaledVector(alphaB.position, alphaB.data.mass).divideScalar(binary.roots[0].data.mass);
+  assert.ok(center.length() < 1e-5, 'both stars orbit the shared barycenter');
+}
+binary.update(epochJd, 0);
+assert.equal(binary.bodies.filter((body) => body.data.type === 'planet').length, 0);
+const earthOrigin = binaryRun.universe.current.origin;
+const distantA = alphaPointDirection(binary, alphaA, earthOrigin, new THREE.Vector3());
+const distantB = alphaPointDirection(binary, alphaB, earthOrigin, new THREE.Vector3());
+assert.ok(distantA.angleTo(distantB) < 0.001,
+  'pre-arrival catalogue points use the real orbit and remain unresolved from Earth');
+const localCamera = new THREE.Vector3(0, 3e9, 0);
+for (const star of [alphaA, alphaB]) {
+  const globalCamera = binary.origin.clone().add(localCamera);
+  const globalDirection = alphaPointDirection(binary, star, earthOrigin, globalCamera);
+  const localDirection = alphaPointDirection(binary, star, binary.origin, localCamera);
+  assert.ok(globalDirection.distanceTo(localDirection) < 0.01,
+    'the catalogue point stays fixed through the frame switch');
+}
+const binaryPoints = new StarPoints(catalog, new THREE.Scene());
+binaryPoints.update(new THREE.Vector3(), -1, ALPHA_A_INDEX, 0.6, new THREE.Vector3(1, 0, 0),
+  { index: ALPHA_B_INDEX, opacity: 0.4, direction: new THREE.Vector3(0, 1, 0) });
+const pointUniforms = binaryPoints.points.material.uniforms;
+assert.equal(pointUniforms.uReachTargetIndex.value, ALPHA_A_INDEX);
+assert.equal(pointUniforms.uReachSecondIndex.value, ALPHA_B_INDEX);
+assert.equal(pointUniforms.uReachSecondOpacity.value, 0.4);
+assert.equal(pointUniforms.uReachTargetMaxPx.value, 7, 'binary points stay small in wide shots');
+binaryPoints.update(new THREE.Vector3(), 0);
+assert.equal(pointUniforms.uReachSecondIndex.value, -1, 'ordinary skies clear the second target');
+assert.equal(pointUniforms.uReachTargetMaxPx.value, 30, 'ordinary star points keep their existing size');
+const establish = until(binaryRun, (s) => s.destinationId === 'alpha:establish' && s.phase.kind === 'observe');
+assert.equal(establish.frame.starId, ALPHA_SYSTEM_ID);
+assert.equal(establish.camera.referenceId, ALPHA_BARY_ID);
+assert.equal(binaryRun.director.alphaCinematic.stage, 'establish');
+const wideCamera = binaryRun.camera.position.clone();
+const toA = alphaA.position.clone().sub(wideCamera);
+const toB = alphaB.position.clone().sub(wideCamera);
+assert.ok(toA.angleTo(toB) > 0.2 && toA.angleTo(toB) < 50 * Math.PI / 180,
+  'the establishing shot resolves both stars inside the 50-degree view');
+const forwardWide = new THREE.Vector3(0, 0, -1).applyQuaternion(binaryRun.camera.quaternion);
+assert.ok(forwardWide.angleTo(toA) < 25 * Math.PI / 180);
+assert.ok(forwardWide.angleTo(toB) < 25 * Math.PI / 180);
+assert.ok(alphaA.radius / toA.length() < 0.001 && alphaB.radius / toB.length() < 0.001,
+  'wide-shot stellar discs retain physical angular size');
+const projectionCamera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 1e12);
+function projected(star) {
+  projectionCamera.quaternion.copy(binaryRun.camera.quaternion);
+  projectionCamera.updateMatrixWorld();
+  return star.position.clone().sub(binaryRun.camera.position).normalize().multiplyScalar(1e10).project(projectionCamera);
+}
+for (const star of [alphaA, alphaB]) {
+  const p = projected(star);
+  assert.ok(Math.abs(p.x) < 0.95 && Math.abs(p.y) < 0.7 && p.z < 1,
+    'both physical stars appear comfortably inside the establishing frustum');
+}
+const lmcIndex = Array.from({ length: binaryRun.universe.galaxies.catalogCount }, (_, i) => i)
+  .find((i) => binaryRun.universe.galaxies.rawName(i).includes('Büyük Macellan'));
+assert.notEqual(lmcIndex, undefined);
+const lmcDirection = binaryRun.universe.galaxies.position(lmcIndex)
+  .sub(binary.origin.clone().add(binaryRun.camera.position).divideScalar(PARSEC_KM)).normalize();
+assert.ok(forwardWide.angleTo(lmcDirection) > 0.65,
+  'the composed sight line clears the nearby Large Magellanic Cloud sprite');
+let previousPosition = binaryRun.camera.position.clone();
+let previousDirection = forwardWide.clone();
+let crossedAu = 0;
+let sawCross = false;
+let sawA = false;
+let sawB = false;
+const stages = new Set();
+for (let i = 0; i < 1500 && !binaryRun.director.terminalObservation; i++) {
+    step(binaryRun);
+    assert.equal(binaryRun.universe.current.starId, ALPHA_SYSTEM_ID);
+    const movement = binaryRun.camera.position.distanceTo(previousPosition);
+    assert.ok(movement < alphaA.position.distanceTo(alphaB.position) * 0.04,
+      'the binary camera changes position continuously');
+    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(binaryRun.camera.quaternion);
+    assert.ok(direction.angleTo(previousDirection) < 0.04,
+      'the binary camera does not snap to an unrelated sky direction');
+    assert.ok(binaryRun.camera.position.distanceTo(alphaA.position) > alphaA.radius * 4.5);
+    assert.ok(binaryRun.camera.position.distanceTo(alphaB.position) > alphaB.radius * 4.5);
+    const shot = binaryRun.director.alphaCinematic;
+    stages.add(shot.stage);
+    const toTarget = shot.target.sub(binaryRun.camera.position).normalize();
+    assert.ok(direction.angleTo(toTarget) < 0.005, 'the camera keeps its intended target projected');
+    if (shot.stage === 'approach-a' || shot.stage === 'approach-b') {
+      const p = projected(shot.stage === 'approach-a' ? alphaA : alphaB);
+      assert.ok(Math.abs(p.x) < 0.95 && Math.abs(p.y) < 0.7,
+        'the active star stays in frame throughout its approach');
+    }
+    if (shot.stage === 'cross-to-b') { sawCross = true; crossedAu += movement / 149_597_870.7; }
+    if (shot.stage === 'observe-a') {
+      sawA = true;
+      assert.ok(Math.abs(binaryRun.camera.position.distanceTo(alphaA.position) / alphaA.radius
+        - REACH_NEARBY_OBSERVATION_RADII) < 0.01);
+      assert.ok(Math.abs(projected(alphaA).x) < 0.01 && Math.abs(projected(alphaA).y) < 0.01);
+    }
+    if (shot.stage === 'observe-b') {
+      sawB = true;
+      assert.ok(Math.abs(binaryRun.camera.position.distanceTo(alphaB.position) / alphaB.radius
+        - REACH_NEARBY_OBSERVATION_RADII) < 0.01);
+      assert.ok(Math.abs(projected(alphaB).x) < 0.01 && Math.abs(projected(alphaB).y) < 0.01);
+    }
+    previousPosition.copy(binaryRun.camera.position);
+    previousDirection.copy(direction);
+}
+assert.ok(sawA && sawB && sawCross && crossedAu > 1, 'the camera observes both stars and crosses the system');
+assert.deepEqual([...stages], ['establish', 'approach-a', 'observe-a', 'retract-a',
+  'cross-to-b', 'approach-b', 'observe-b', 'retract-b', 'final-overview']);
+const handoff = reachPilotStarAppearance(ALPHA_B_INDEX, 0.82, true, false);
+assert.ok(handoff.pointOpacity > 0 && handoff.pointOpacity < 1);
+assert.equal(handoff.pointOpacity + handoff.discScale, 1);
+const terminal = binaryRun.director.capture();
+assert.equal(terminal.frame.starId, ALPHA_SYSTEM_ID);
+assert.equal(binaryRun.director.terminalObservation, true);
+const finalA = alphaA.position.clone().sub(binaryRun.camera.position);
+const finalB = alphaB.position.clone().sub(binaryRun.camera.position);
+assert.ok(finalA.angleTo(finalB) > 0.2 && finalA.angleTo(finalB) < 50 * Math.PI / 180);
+for (const star of [alphaA, alphaB]) {
+  const p = projected(star);
+  assert.ok(Math.abs(p.x) < 0.95 && Math.abs(p.y) < 0.7 && p.z < 1,
+    'both stars remain inside the final overview frustum');
+}
+const heldPosition = binaryRun.camera.position.clone();
+const heldOrientation = binaryRun.camera.quaternion.clone();
+for (let i = 0; i < 100; i++) step(binaryRun);
+assert.ok(binaryRun.camera.position.distanceTo(heldPosition) < 1e-8);
+assert.ok(binaryRun.camera.quaternion.angleTo(heldOrientation) < 1e-8);
+assert.equal(binaryRun.director.capture().destinationId, 'alpha:departure');
+assert.equal(binaryRun.director.roundTrips, 0);
+assert.equal(parseReachJourney(JSON.stringify(terminal), REACH_PRODUCTION_ROUTE, () => true), null);
 console.log('PASS real Proxima catalogue, Solar departure, frame switch, arrival, resume, distance, invalid recovery');
 console.log('PASS isolated short preview, handoff state, generated-body points, and terminal observation');
+console.log('PASS eight nearby catalogue stars, preview routes, clearance, handoff, observation and save isolation');
+console.log('PASS Alpha Centauri barycentric orbit, two-star framing, A/B close-ups and terminal preview isolation');

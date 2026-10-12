@@ -32,6 +32,8 @@ import { LocalStorageReachJourneyStore, REACH_PROXIMA_PILOT_KEY, inspectReachJou
 import { ReachTiming } from './reach/ReachTiming';
 import { ReachArrivalTrace } from './reach/ReachArrivalTrace';
 import { suppressProximaPlanetMeshes } from './reach/ReachPlanetMeshIsolation';
+import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_SYSTEM_ID,
+  alphaPointDirection, createAlphaCentauriPreviewSystem } from './reach/ReachAlphaCentauri';
 import { preparePlanetResources } from './reach/ReachPlanetResourcePreparation';
 import { PerseveranceSurfacePreview, marsPreviewDaylightJd } from './reach/PerseveranceSurfacePreview';
 import { UI, type UIHost } from './ui/UI';
@@ -56,24 +58,28 @@ const REACH_FLICKER = import.meta.env.DEV && REACH_MODE
   && new URLSearchParams(window.location.search).get('reachFlicker') === '1';
 const REACH_PILOT = import.meta.env.DEV && REACH_MODE
   && new URLSearchParams(window.location.search).get('reachPilot') === 'proxima';
-const REACH_PROXIMA_PREVIEW = import.meta.env.DEV && REACH_MODE
-  && new URLSearchParams(window.location.search).get('reachPreview') === 'proxima';
-const REACH_PROXIMA_ENCOUNTER = REACH_PILOT || REACH_PROXIMA_PREVIEW;
-const REACH_TRACE = REACH_PROXIMA_ENCOUNTER && new URLSearchParams(window.location.search).get('reachTrace') === '1';
-const REACH_TRACE_FRESH = REACH_TRACE && new URLSearchParams(window.location.search).get('reachFresh') === '1';
-const REACH_NO_CORONA_BLEND = REACH_PROXIMA_ENCOUNTER
-  && new URLSearchParams(window.location.search).get('reachNoCoronaBlend') === '1';
-const REACH_NO_PLANET_MESHES = REACH_PROXIMA_ENCOUNTER
-  && new URLSearchParams(window.location.search).get('reachNoPlanetMeshes') === '1';
-const REACH_SHOW_PLANET_MESHES = REACH_PROXIMA_ENCOUNTER
-  && new URLSearchParams(window.location.search).get('reachShowPlanetMeshes') === '1';
-const REACH_HIDE_PROXIMA_PLANETS = REACH_PROXIMA_ENCOUNTER
-  && (!REACH_SHOW_PLANET_MESHES || REACH_NO_PLANET_MESHES);
-if (REACH_TRACE) (window as Window & { __reachArrivalTrace?: boolean }).__reachArrivalTrace = true;
 const REACH_PREVIEW_ID = import.meta.env.DEV && REACH_MODE
   ? new URLSearchParams(window.location.search).get('reachPreview') : null;
 const REACH_PREVIEW_ROUTE = REACH_PREVIEW_ID ? reachPreviewRoute(REACH_PREVIEW_ID) : null;
 if (REACH_PREVIEW_ID && !REACH_PREVIEW_ROUTE) throw new Error(`Unknown Reach preview stop: ${REACH_PREVIEW_ID}`);
+const REACH_ALPHA_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:alpha-centauri';
+const REACH_PREVIEW_STAR_ID = REACH_PREVIEW_ROUTE?.stops[1]?.ref?.kind === 'star'
+  ? REACH_PREVIEW_ROUTE.stops[1].ref.starId : null;
+const REACH_STAR_ENCOUNTER_ID = REACH_ALPHA_PREVIEW ? ALPHA_SYSTEM_ID
+  : REACH_PREVIEW_ROUTE ? REACH_PREVIEW_STAR_ID
+  : (REACH_PILOT ? 'c64548' : null);
+const REACH_TRACE = REACH_STAR_ENCOUNTER_ID === 'c64548'
+  && new URLSearchParams(window.location.search).get('reachTrace') === '1';
+const REACH_TRACE_FRESH = REACH_TRACE && new URLSearchParams(window.location.search).get('reachFresh') === '1';
+const REACH_NO_CORONA_BLEND = REACH_STAR_ENCOUNTER_ID !== null
+  && new URLSearchParams(window.location.search).get('reachNoCoronaBlend') === '1';
+const REACH_NO_PLANET_MESHES = REACH_STAR_ENCOUNTER_ID !== null
+  && new URLSearchParams(window.location.search).get('reachNoPlanetMeshes') === '1';
+const REACH_SHOW_PLANET_MESHES = REACH_STAR_ENCOUNTER_ID !== null
+  && new URLSearchParams(window.location.search).get('reachShowPlanetMeshes') === '1';
+const REACH_HIDE_ENCOUNTER_PLANETS = REACH_STAR_ENCOUNTER_ID !== null
+  && (!REACH_SHOW_PLANET_MESHES || REACH_NO_PLANET_MESHES);
+if (REACH_TRACE) (window as Window & { __reachArrivalTrace?: boolean }).__reachArrivalTrace = true;
 const REACH_SURFACE_PREVIEW = import.meta.env.DEV && REACH_MODE
   && new URLSearchParams(window.location.search).get('reachSurface') === 'perseverance';
 if (REACH_SURFACE_PREVIEW && (new URLSearchParams(window.location.search).get('panorama') === '1'
@@ -106,6 +112,8 @@ class App implements UIHost {
   private readonly surfacePreview: PerseveranceSurfacePreview | null;
   private readonly reachCountdown: ReachCountdownOverlay | null;
   private readonly reachOdometer: ReachOdometerOverlay | null;
+  private alphaMarkers: HTMLDivElement[] = [];
+  private alphaDiagnostics: HTMLPreElement | null = null;
   private readonly panorama = REACH_MODE ? readReachPanorama() : null;
   private readonly panoramaSync = this.panorama ? new ReachPanoramaSync(this.panorama) : null;
   private lastPanoramaSequence = -1;
@@ -116,7 +124,7 @@ class App implements UIHost {
   private lastReachSave = performance.now();
   private reachCheckpointWritable = true;
   private readonly arrivalTrace = REACH_TRACE
-    ? new ReachArrivalTrace(REACH_NO_CORONA_BLEND, REACH_HIDE_PROXIMA_PLANETS) : null;
+    ? new ReachArrivalTrace(REACH_NO_CORONA_BLEND, REACH_HIDE_ENCOUNTER_PLANETS) : null;
   private planetPreparation: AbortController | null = null;
   readonly ui: UI;
   selected: CelestialBody | null = null;
@@ -172,7 +180,8 @@ class App implements UIHost {
     const range = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE) as Float32Array | number[];
     this.maxPointPx = Math.max(32, Math.min(256, (range?.[1] ?? 64) / this.engine.pixelRatio));
 
-    this.universe = new Universe(catalog);
+    this.universe = new Universe(catalog,
+      REACH_ALPHA_PREVIEW ? createAlphaCentauriPreviewSystem(catalog) : null);
     let savedJourney = REACH_PREVIEW_ROUTE || REACH_SURFACE_PREVIEW ? null : diagnosticJourney;
     if (this.reachStore && !REACH_PREVIEW_ROUTE && !REACH_SURFACE_PREVIEW) {
       const stored = inspectReachJourneyStore(this.reachStore, REACH_ROUTE, (id) => {
@@ -278,11 +287,29 @@ class App implements UIHost {
       this.reach = new ReachVoyageDirector(this.universe, this.camera, this.time,
         new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach(), REACH_ROUTE);
       const countdown = readCountdownContract(true);
-      this.reachCountdown = countdown ? new ReachCountdownOverlay(this.reach, countdown.position) : null;
+      this.reachCountdown = countdown ? new ReachCountdownOverlay(this.reach,
+        REACH_ALPHA_PREVIEW ? 'top-centre' : countdown.position) : null;
       const odometer = readOdometerContract(true);
-      this.reachOdometer = odometer ? new ReachOdometerOverlay(this.reach, odometer.position) : null;
+      this.reachOdometer = odometer ? new ReachOdometerOverlay(this.reach,
+        REACH_ALPHA_PREVIEW ? 'top-centre' : odometer.position) : null;
       this.reachCountdown?.update(performance.now());
       this.reachOdometer?.update(performance.now());
+      if (REACH_ALPHA_PREVIEW) {
+        for (const name of ['ALPHA A', 'ALPHA B']) {
+          const marker = document.createElement('div');
+          marker.className = 'reach-alpha-marker';
+          marker.textContent = name;
+          document.body.appendChild(marker);
+          this.alphaMarkers.push(marker);
+        }
+        Object.defineProperty(window, '__reachAlphaStatus', {
+          value: () => this.alphaPreviewStatus(), configurable: false,
+        });
+        this.alphaDiagnostics = document.createElement('pre');
+        this.alphaDiagnostics.id = 'reach-alpha-diagnostics';
+        this.alphaDiagnostics.hidden = true;
+        document.body.appendChild(this.alphaDiagnostics);
+      }
       this.uiVisible = false;
       window.addEventListener('pagehide', () => this.checkpointReach());
       document.addEventListener('visibilitychange', () => {
@@ -338,6 +365,74 @@ class App implements UIHost {
     this.lastReachSave = performance.now();
   }
 
+  /** Development-only binary shot diagnostics, in the active system's km frame. */
+  private alphaPreviewStatus(): object {
+    const cinematic = this.reach?.alphaCinematic;
+    const binary = this.universe.system(ALPHA_SYSTEM_ID);
+    if (binary !== this.universe.current) binary.update(this.time.jd, this.time.t);
+    const project = (relative: Vector3) => {
+      const distanceKm = relative.length();
+      const ndc = relative.clone().normalize().multiplyScalar(1e11).project(this.engine.camera);
+      return { distanceKm, x: (ndc.x + 1) * this.engine.width / 2,
+        y: (1 - ndc.y) * this.engine.height / 2,
+        visible: ndc.z >= -1 && ndc.z <= 1 && Math.abs(ndc.x) <= 1 && Math.abs(ndc.y) <= 1 };
+    };
+    const a = binary?.get(`s${ALPHA_A_INDEX}-star`);
+    const b = binary?.get(`s${ALPHA_B_INDEX}-star`);
+    const toA = a && alphaPointDirection(binary, a, this.universe.current.origin, this.camera.position);
+    const toB = b && alphaPointDirection(binary, b, this.universe.current.origin, this.camera.position);
+    const landmarks = this.landmarkSprites.named.map((item) => ({
+      name: item.name, radiusPx: item.radiusPx,
+      ...project(item.dir.clone()),
+    })).filter((item) => item.visible);
+    const galaxies = this.galaxySprites.named.map((item) => ({
+      name: item.name, radiusPx: this.galaxySprites.apparent(item.index).angRad
+        * this.engine.height / 2 / Math.tan(this.engine.localVerticalFovRad / 2),
+      ...project(item.dir.clone()),
+    })).filter((item) => item.visible);
+    return {
+      stage: cinematic?.stage ?? 'interstellar-approach',
+      label: cinematic?.label ?? 'APPROACH ALPHA CENTAURI',
+      secondsLeft: cinematic?.secondsLeft ?? this.reach?.countdown.secondsLeft,
+      terminal: cinematic?.terminal ?? false,
+      frame: this.universe.current.starId,
+      camera: { framePositionKm: this.camera.position.toArray(),
+        worldPositionKm: this.universe.current.origin.clone().add(this.camera.position).toArray(),
+        direction: new Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion).toArray(),
+        targetKm: cinematic?.target.toArray()
+          ?? binary.origin.clone().sub(this.universe.current.origin).toArray() },
+      separationKm: a && b ? a.position.distanceTo(b.position) : null,
+      angularSeparationDeg: toA && toB ? toA.angleTo(toB) / DEG : null,
+      stars: a && b && toA && toB ? {
+        a: { id: a.id, positionKm: a.position.toArray(),
+          worldPositionKm: binary.origin.clone().add(a.position).toArray(), ...project(toA),
+          meshVisible: this.bodies.byId.get(a.id)?.meshVisible ?? false },
+        b: { id: b.id, positionKm: b.position.toArray(),
+          worldPositionKm: binary.origin.clone().add(b.position).toArray(), ...project(toB),
+          meshVisible: this.bodies.byId.get(b.id)?.meshVisible ?? false },
+      } : null,
+      landmarks, galaxies,
+    };
+  }
+
+  private updateAlphaMarkers(): void {
+    const status = this.alphaPreviewStatus() as {
+      stage: string; stars: { a: { x: number; y: number; visible: boolean },
+        b: { x: number; y: number; visible: boolean } } | null;
+    };
+    if (this.alphaDiagnostics) this.alphaDiagnostics.textContent = JSON.stringify(status);
+    const wide = ['establish', 'retract-a', 'cross-to-b', 'retract-b', 'final-overview'].includes(status.stage);
+    for (const [i, star] of [status.stars?.a, status.stars?.b].entries()) {
+      const marker = this.alphaMarkers[i];
+      if (!marker) continue;
+      marker.hidden = !wide || !star?.visible;
+      if (star) {
+        marker.style.left = `${star.x + 13}px`;
+        marker.style.top = `${star.y - 9}px`;
+      }
+    }
+  }
+
   /**
    * The planetary system out to Jupiter from ~40° above the ecliptic, leaning to Earth's side so the
    * inner planets sit in the foreground, slowly circling the Sun. Orbit lines are forced on while
@@ -387,7 +482,7 @@ class App implements UIHost {
     this.sunColor.set(r, g, b);
     this.starLuminosity = sys.catalogIndex === 0 ? 1 : this.universe.starInfo(sys.starId).luminosity;
     if (started) this.arrivalTrace!.event('load-system-renderables', performance.now() - started);
-    if (REACH_PROXIMA_ENCOUNTER && !REACH_HIDE_PROXIMA_PLANETS && sys.starId === 'c64548') {
+    if (REACH_STAR_ENCOUNTER_ID === sys.starId && !REACH_HIDE_ENCOUNTER_PLANETS) {
       const preparation = new AbortController();
       this.planetPreparation = preparation;
       this.arrivalTrace?.event('planet-preparation-start');
@@ -1336,8 +1431,9 @@ class App implements UIHost {
     this.surfacePreview?.render(this.bodies.byId.get('mars'), this.bodies.byId.get('perseverance'));
     const eligibleMeshes = this.arrivalTrace && this.universe.current.starId === 'c64548'
       ? this.bodies.views.filter((view) => view.meshVisible).map((view) => view.body.id).join(',') : '';
-    const hideGeneratedBodies = REACH_HIDE_PROXIMA_PLANETS && this.universe.current.starId === 'c64548';
-    if (hideGeneratedBodies) {
+    const hideGeneratedBodies = REACH_HIDE_ENCOUNTER_PLANETS
+      && this.universe.current.starId === REACH_STAR_ENCOUNTER_ID;
+    if (hideGeneratedBodies && !REACH_ALPHA_PREVIEW) {
       suppressProximaPlanetMeshes(this.bodies.views, star.id);
     }
     const bodiesMs = bodiesStarted ? performance.now() - bodiesStarted : 0;
@@ -1372,14 +1468,50 @@ class App implements UIHost {
     }
     if (starCruise && !REACH_NO_CORONA_BLEND && starView?.coronaMat)
       starView.coronaMat.uniforms.uIntensity.value *= starAppearance.coronaScale;
-    this.starPoints.update(this.camPc, starAppearance.hideIndex,
-      starAppearance.targetIndex, starAppearance.pointOpacity,
-      starCruise ? starView?.relPos ?? null : null);
+    if (REACH_ALPHA_PREVIEW && this.universe.current.starId === ALPHA_SYSTEM_ID) {
+      const aView = this.bodies.byId.get(`s${ALPHA_A_INDEX}-star`);
+      const bView = this.bodies.byId.get(`s${ALPHA_B_INDEX}-star`);
+      if (!aView || !bView) throw new Error('Alpha Centauri preview is missing a stellar renderer');
+      const aAppearance = reachPilotStarAppearance(ALPHA_A_INDEX, aView.apparentRadiusPx, true, false);
+      const bAppearance = reachPilotStarAppearance(ALPHA_B_INDEX, bView.apparentRadiusPx, true, false);
+      const [x, y, z] = reachStarVisualDrift(Date.now() / 1000);
+      for (const [view, appearance] of [[aView, aAppearance], [bView, bAppearance]] as const) {
+        const isB = view === bView;
+        if (view.surfaceMat) {
+          view.surfaceMat.uniforms.uIntensity.value = (isB ? 0.62 : 0.75) * appearance.discScale;
+          view.surfaceMat.uniforms.uDrift.value.set(x, y, z);
+          view.surfaceMat.uniforms.uMotionStrength.value = 0.6;
+          view.surfaceMat.uniforms.uColorWarmth.value = isB ? 0.27 : 0;
+        }
+        if (view.coronaMat) {
+          view.coronaMat.uniforms.uIntensity.value *= appearance.coronaScale;
+          view.coronaMat.uniforms.uDrift.value.set(x, y, z);
+          view.coronaMat.uniforms.uMotionStrength.value = 0.2;
+          view.coronaMat.uniforms.uColorWarmth.value = isB ? 0.18 : 0;
+        }
+      }
+      this.starPoints.update(this.camPc, -1, ALPHA_A_INDEX, aAppearance.pointOpacity, aView.relPos,
+        { index: ALPHA_B_INDEX, opacity: bAppearance.pointOpacity, direction: bView.relPos });
+    } else if (REACH_ALPHA_PREVIEW) {
+      const binary = this.universe.system(ALPHA_SYSTEM_ID);
+      binary.update(this.time.jd, this.time.t);
+      const a = binary.get(`s${ALPHA_A_INDEX}-star`)!;
+      const b = binary.get(`s${ALPHA_B_INDEX}-star`)!;
+      this.starPoints.update(this.camPc, -1, ALPHA_A_INDEX, 1,
+        alphaPointDirection(binary, a, this.universe.current.origin, camPos),
+        { index: ALPHA_B_INDEX, opacity: 1,
+          direction: alphaPointDirection(binary, b, this.universe.current.origin, camPos) });
+    } else {
+      this.starPoints.update(this.camPc, starAppearance.hideIndex,
+        starAppearance.targetIndex, starAppearance.pointOpacity,
+        starCruise ? starView?.relPos ?? null : null);
+    }
     this.procPoints.update(this.camPc, eng.pixelRatio, this.universe.current.starId, dt);
     for (const c of this.clouds.values()) c.update(this.camPc, pxPerRad, eng.pixelRatio, s.milkyWay);
     this.galaxySprites.update(this.camPc, pxPerRad, eng.pixelRatio, this.galaxyBoost, this.universe.currentGalaxy ?? -1);
     this.landmarkSprites.update(this.camPc, pxPerRad, this.universe.current.starId, (gi) => this.galaxySprites.apparent(gi).ratio);
     this.nebulaClouds.update(this.camPc, pxPerRad, eng.pixelRatio, this.landmarkSprites.k, this.landmarkSprites.mesh.visible);
+    if (REACH_ALPHA_PREVIEW) this.updateAlphaMarkers();
     // bottom-left credit: streamed planetary imagery first, otherwise a resolved landmark photograph
     if (this.bodies.imageryCredit) this.ui.setImageryCredit(this.bodies.imageryCredit);
     else {

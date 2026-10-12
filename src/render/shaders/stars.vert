@@ -11,6 +11,10 @@ uniform float uHideIndex;  // index of the current system's star (rendered as a 
 uniform float uReachTargetIndex; // optional guided-voyage target, visible before its local disc resolves
 uniform float uReachTargetOpacity; // pilot-only point/corona handoff; 1 for ordinary stars
 uniform vec3 uReachTargetDirection; // precise local direction near the guided-voyage target
+uniform float uReachSecondIndex;
+uniform float uReachSecondOpacity;
+uniform vec3 uReachSecondDirection;
+uniform float uReachTargetMaxPx;
 uniform float uMagLimit;   // faintest apparent magnitude drawn
 varying vec3 vColor;
 varying float vAlpha;
@@ -20,17 +24,20 @@ void main() {
   vec3 rel = position - uCamPc;
   float d = max(length(rel), 1e-7);
   bool reachTarget = abs(starIndex - uReachTargetIndex) < 0.5;
-  vec3 dir = reachTarget ? uReachTargetDirection : rel / d;
+  bool reachSecond = abs(starIndex - uReachSecondIndex) < 0.5;
+  vec3 dir = reachTarget ? uReachTargetDirection : reachSecond ? uReachSecondDirection : rel / d;
   // apparent magnitude from absolute magnitude and distance (pc)
   float m = absMag + 5.0 * (log(d) / log(10.0)) - 5.0;
-  float displayMag = reachTarget ? min(m, 2.0) : m;
+  float displayMag = (reachTarget || reachSecond) ? min(m, 2.0) : m;
   vec4 mv = modelViewMatrix * vec4(dir * uSkyRadius, 1.0);
   gl_Position = projectionMatrix * mv;
   float flux = pow(10.0, -0.4 * displayMag);
   float size = min(30.0, 1.3 + 3.0 * pow(flux, 0.4));
+  if (reachTarget || reachSecond) size = min(size, uReachTargetMaxPx);
   float alpha = min(1.0, 0.16 + 0.9 * pow(flux, 0.45));
   if (reachTarget) alpha *= uReachTargetOpacity;
-  if (abs(starIndex - uHideIndex) < 0.5 || (m > uMagLimit && !reachTarget)) {
+  if (reachSecond) alpha *= uReachSecondOpacity;
+  if (abs(starIndex - uHideIndex) < 0.5 || (m > uMagLimit && !reachTarget && !reachSecond)) {
     size = 0.0;
     alpha = 0.0;
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // clip

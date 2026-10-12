@@ -35,6 +35,7 @@ export class ReachCountdownOverlay {
   private readonly element = document.createElement('div');
   private lastUpdate = -Infinity;
   private lastRouteIndex = -1;
+  private lastCinematicStage = '';
 
   constructor(private readonly director: ReachVoyageDirector, private readonly position: CountdownPosition | 'auto') {
     this.element.id = 'reach-countdown';
@@ -48,8 +49,24 @@ export class ReachCountdownOverlay {
       this.lastRouteIndex = countdown.routeIndex;
       this.element.dataset.position = resolveCountdownPosition(this.position, countdown.routeIndex);
     }
-    if (now - this.lastUpdate < 1000) return;
+    const cinematic = this.director.alphaCinematic;
+    const cinematicStage = cinematic?.stage ?? (this.director.alphaPreview ? countdown.destinationId : '');
+    if (now - this.lastUpdate < 1000 && cinematicStage === this.lastCinematicStage) return;
     this.lastUpdate = now;
+    this.lastCinematicStage = cinematicStage;
+    if (import.meta.env?.DEV !== false && cinematic) {
+      const text = cinematic.terminal
+        ? 'ALPHA CENTAURI A/B - FINAL OVERVIEW'
+        : `${cinematic.label} ${formatCountdown(cinematic.secondsLeft)}`;
+      if (this.element.textContent !== text) this.element.textContent = text;
+      return;
+    }
+    if (import.meta.env?.DEV !== false && this.director.alphaPreview) {
+      const phase = countdown.destinationId === 'earth' ? 'LEAVING EARTH' : 'INTERSTELLAR APPROACH';
+      const text = `${phase}: ALPHA CENTAURI A/B ${formatCountdown(countdown.secondsLeft)}`;
+      if (this.element.textContent !== text) this.element.textContent = text;
+      return;
+    }
     const name = this.director.countdownLabel.replace(/([a-z])(\d)/g, '$1 $2').toUpperCase();
     const phase = this.director.terminalObservation
       ? countdown.secondsLeft > 0 ? 'OBSERVE' : 'ARRIVED' : countdown.phase;

@@ -101,7 +101,7 @@ export class Universe {
   private readonly cache = new Map<StarId, StarSystem>();
   private readonly listeners: Array<(sys: StarSystem, prev: StarSystem) => void> = [];
 
-  constructor(readonly catalog: StarCatalog) {
+  constructor(readonly catalog: StarCatalog, private readonly previewSystem: StarSystem | null = null) {
     this.galaxies = new GalaxyIndex();
     this.procStars = new ProcStars(this.galaxies);
     const findGalaxy = (q: string): number | null => {
@@ -284,6 +284,10 @@ export class Universe {
   system(id: StarId): StarSystem {
     const cached = this.cache.get(id);
     if (cached) return cached;
+    if (this.previewSystem?.starId === id) {
+      this.cache.set(id, this.previewSystem);
+      return this.previewSystem;
+    }
     const started = reachArrivalTraceEnabled() && id === 'c64548' ? performance.now() : 0;
     let sys: StarSystem;
     const ci = catalogIndexOf(id);

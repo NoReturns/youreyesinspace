@@ -1,4 +1,5 @@
 import type { ReachTimingDestination } from './ReachTiming';
+import { ALPHA_BARY_ID, ALPHA_SYSTEM_ID, ALPHA_A_INDEX, ALPHA_B_INDEX } from './ReachAlphaCentauri';
 
 export type ReachDestinationRef =
   | { kind: 'body'; systemId: string; bodyId: string }
@@ -15,6 +16,8 @@ export interface ReachStop extends ReachTimingDestination {
     coronaMotion: number;
     colorWarmth: number;
   };
+  /** Development-only A/B establishing or departure overview. */
+  binaryOverview?: boolean;
 }
 
 export interface ReachRoute {
@@ -31,6 +34,42 @@ export const REACH_PROXIMA_PILOT: ReachRoute = {
     { id: 'star:c64548', profile: 'star', label: 'Proxima Centauri',
       ref: { kind: 'star', starId: 'c64548' },
       starPresentation: { observationDistanceRadii: 6.95, surfaceMotion: 1, coronaMotion: 0.35, colorWarmth: 0.85 } },
+  ],
+};
+
+/** Catalogue primary stars exposed only through development preview routes. */
+export const REACH_NEARBY_STAR_PREVIEWS = {
+  barnard: ['c80155', "Barnard's Star"],
+  'wolf-359': ['c108500', 'Wolf 359'],
+  'lalande-21185': ['c49269', 'Lalande 21185'],
+  sirius: ['c29786', 'Sirius A'],
+  'ross-248': ['c109365', 'Ross 248'],
+  'epsilon-eridani': ['c15247', 'Epsilon Eridani'],
+  'tau-ceti': ['c7458', 'Tau Ceti'],
+  vega: ['c83130', 'Vega'],
+} as const;
+
+/** A 50-degree vertical FOV gives a 30% disc while clearing the 4.5-radius corona. */
+export const REACH_NEARBY_OBSERVATION_RADII = Math.max(4.8,
+  Math.sqrt(1 + 1 / (0.30 * Math.tan(50 * Math.PI / 360)) ** 2));
+
+const alphaBaryRef: ReachDestinationRef = { kind: 'body', systemId: ALPHA_SYSTEM_ID, bodyId: ALPHA_BARY_ID };
+export const REACH_ALPHA_CENTAURI_PREVIEW: ReachRoute = {
+  id: 'preview:alpha-centauri', version: 1, repeat: false,
+  stops: [
+    { id: 'earth', profile: 'planet', ref: { kind: 'body', systemId: 'c0', bodyId: 'earth' } },
+    { id: 'alpha:establish', profile: 'star', label: 'Alpha Centauri A/B',
+      ref: alphaBaryRef, binaryOverview: true },
+    { id: 'alpha:a', profile: 'star', label: 'Alpha Centauri A',
+      ref: { kind: 'body', systemId: ALPHA_SYSTEM_ID, bodyId: `s${ALPHA_A_INDEX}-star` },
+      starPresentation: { observationDistanceRadii: REACH_NEARBY_OBSERVATION_RADII,
+        surfaceMotion: 0.6, coronaMotion: 0.2, colorWarmth: 0 } },
+    { id: 'alpha:b', profile: 'star', label: 'Alpha Centauri B',
+      ref: { kind: 'body', systemId: ALPHA_SYSTEM_ID, bodyId: `s${ALPHA_B_INDEX}-star` },
+      starPresentation: { observationDistanceRadii: REACH_NEARBY_OBSERVATION_RADII,
+        surfaceMotion: 0.6, coronaMotion: 0.2, colorWarmth: 0 } },
+    { id: 'alpha:departure', profile: 'star', label: 'Alpha Centauri A/B',
+      ref: alphaBaryRef, binaryOverview: true },
   ],
 };
 

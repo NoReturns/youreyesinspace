@@ -13,8 +13,11 @@ import {
 } from './JourneyState';
 import { ReachTiming } from './ReachTiming';
 import { geometricLegKm, type ReachDistanceLeg } from './ReachOdometer';
-import { destinationRef, destinationSystem, REACH_PROXIMA_PILOT, type ReachRoute, type ReachStop } from './ReachDestinations';
+import { destinationRef, destinationSystem, REACH_NEARBY_OBSERVATION_RADII,
+  REACH_NEARBY_STAR_PREVIEWS, REACH_PROXIMA_PILOT, REACH_ALPHA_CENTAURI_PREVIEW,
+  type ReachRoute, type ReachStop } from './ReachDestinations';
 import { reachArrivalTraceEnabled } from './ReachArrivalTrace';
+import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, ReachAlphaCinematic } from './ReachAlphaCentauri';
 
 type Stop = ReachStop;
 
@@ -75,9 +78,22 @@ export const REACH_PRODUCTION_ROUTE: ReachRoute = {
 
 /** Development-only caller supplies a selected production stop; this route has no persistence key. */
 export function reachPreviewRoute(id: string): ReachRoute | null {
+  if (id === 'alpha-centauri') return REACH_ALPHA_CENTAURI_PREVIEW;
   if (id === 'proxima') return {
     id: 'preview:proxima', version: 1, stops: REACH_PROXIMA_PILOT.stops, repeat: false,
   };
+  const nearby = Object.prototype.hasOwnProperty.call(REACH_NEARBY_STAR_PREVIEWS, id)
+    ? REACH_NEARBY_STAR_PREVIEWS[id as keyof typeof REACH_NEARBY_STAR_PREVIEWS] : null;
+  if (nearby) {
+    const [starId, label] = nearby;
+    return { id: `preview:${id}`, version: 1, repeat: false,
+      stops: [REACH_ITINERARY[0], {
+        id: `star:${starId}`, profile: 'star', label, ref: { kind: 'star', starId },
+        starPresentation: { observationDistanceRadii: REACH_NEARBY_OBSERVATION_RADII,
+          surfaceMotion: 0.6, coronaMotion: 0.2, colorWarmth: 0 },
+      }],
+    };
+  }
   const stop = REACH_ITINERARY.find((candidate) => candidate.id === id);
   if (!stop) return null;
   return { id: `preview:${id}`, version: 1,
@@ -115,8 +131,11 @@ export class ReachVoyageDirector {
     orbitRate: number; radialSpeed: number; endRadius: number; duration: number; elapsed: number;
   } | null = null;
   private readonly stops: readonly ReachStop[];
+  private alpha: ReachAlphaCinematic | null = null;
 
-  get directing(): boolean { return this.stage === 'departure' || this.stage === 'flyby'; }
+  get directing(): boolean { return !!this.alpha || this.stage === 'departure' || this.stage === 'flyby'; }
+  get alphaPreview(): boolean { return import.meta.env?.DEV !== false && this.route.id === 'preview:alpha-centauri'; }
+  get alphaCinematic(): ReachAlphaCinematic | null { return this.alpha; }
   get roundTrips(): number { return this.roundTripCount; }
   get countdownLabel(): string {
     const id = this.countdown.destinationId;
@@ -124,6 +143,7 @@ export class ReachVoyageDirector {
     return stop?.label ?? id;
   }
   get terminalObservation(): boolean {
+    if (this.alpha) return this.alpha.terminal;
     return !this.route.repeat && this.stop === this.stops.length - 1 && this.stage === 'observe';
   }
   get distanceTravelledKm(): number {
@@ -133,6 +153,8 @@ export class ReachVoyageDirector {
   }
 
   get countdown(): { phase: 'NEXT' | 'DEPART' | 'CRUISE'; destinationId: string; routeIndex: number; secondsLeft: number } {
+    if (this.alpha) return { phase: 'DEPART', destinationId: this.stops[this.stop].id,
+      routeIndex: this.stop, secondsLeft: this.alpha.secondsLeft };
     if (this.stage === 'departure') {
       const d = this.departure!;
       return { phase: 'CRUISE', destinationId: this.stops[d.next].id,
@@ -262,6 +284,14 @@ export class ReachVoyageDirector {
 
   update(dt: number, paused: boolean): void {
     if (paused) return;
+    if (this.alpha) {
+      if (this.alpha.update(dt)) {
+        const shot = this.alpha.stage;
+        this.stop = shot.endsWith('-a') ? 2 : shot.endsWith('-b') || shot === 'cross-to-b' ? 3 : 4;
+        this.onPhaseChange?.();
+      }
+      return;
+    }
     if (this.stage === 'departure') { this.updateDeparture(dt); return; }
     if (this.stage === 'flyby') { this.updateFlyby(dt); return; }
     if (this.stage === 'cruise') {
@@ -272,6 +302,18 @@ export class ReachVoyageDirector {
       }
       this.transitionFromVersion = null;
       const stop = this.stops[this.stop];
+      if (import.meta.env?.DEV !== false && this.route.id === 'preview:alpha-centauri' && stop.id === 'alpha:establish') {
+        const barycenter = this.body(ALPHA_BARY_ID);
+        const a = this.body(`s${ALPHA_A_INDEX}-star`);
+        const b = this.body(`s${ALPHA_B_INDEX}-star`);
+        this.alpha = new ReachAlphaCinematic(this.camera, barycenter, a, b,
+          this.stops[2].starPresentation!.observationDistanceRadii);
+        this.stage = 'observe';
+        this.observeDuration = this.alpha.secondsLeft;
+        this.observeLeft = this.observeDuration;
+        this.onPhaseChange?.();
+        return;
+      }
       if (stop.profile === 'moon') {
         const body = this.body(stop.id);
         this.flyby = {
@@ -321,7 +363,7 @@ export class ReachVoyageDirector {
       orientation: this.camera.quaternion.clone(),
       up: new Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).normalize(),
       orbitRate, radialSpeed,
-      endRadius: Math.max(offset.length() * (isMoon ? 4 : 6),
+      endRadius: Math.max(offset.length() * (this.stops[this.stop].binaryOverview ? 1.5 : isMoon ? 4 : 6),
         source.radius * (this.stops[next].profile === 'star' ? 300 : 20)),
       duration, elapsed: 0,
     };
@@ -373,17 +415,39 @@ export class ReachVoyageDirector {
     const approach = stop.profile === 'moon' && destination.parent
       ? new Vector3().subVectors(destination.position, destination.parent.position).normalize()
       : fromDestination;
-    const distance = stop.profile === 'star' || stop.profile === 'sun'
+    const binaryPair = stop.binaryOverview ? this.universe.current : null;
+    const companion = binaryPair?.get('s65259-star');
+    const primary = binaryPair?.get('s65262-star');
+    const binarySeparation = companion && primary ? companion.position.distanceTo(primary.position) : 0;
+    const distance = stop.binaryOverview ? binarySeparation * 1.6
+      : stop.profile === 'star' || stop.profile === 'sun'
       ? destination.radius * (stop.starPresentation?.observationDistanceRadii ?? 40)
       : stop.profile === 'probe' ? destination.radius * 4.5
       : stop.profile === 'moon' ? destination.radius * 5
       : Math.max(destination.radius * 3.6, (destination.data.rings?.outer ?? 0) * 2.2);
     const flightDuration = this.timing.travel(stop);
-    const arrival = stop.profile === 'star' ? approach
-      : this.sunlitArrivalDirection(stop, approach, fromDestination, distance, flightDuration);
-    this.camera.goToVantage(destination, arrival, distance, flightDuration, undefined, stop.profile !== 'star', true);
+    const binaryDirection = stop.binaryOverview && companion && primary
+      ? this.binaryOverviewDirection(approach, companion.position.clone().sub(primary.position)) : null;
+    const arrival = binaryDirection ?? (stop.profile === 'star' ? approach
+      : this.sunlitArrivalDirection(stop, approach, fromDestination, distance, flightDuration));
+    const binaryUp = binaryDirection && companion && primary
+      ? new Vector3().crossVectors(companion.position.clone().sub(primary.position), binaryDirection).normalize()
+      : undefined;
+    this.camera.goToVantage(destination, arrival, distance, flightDuration, binaryUp, stop.profile !== 'star', true);
     this.stage = 'cruise';
     this.onPhaseChange?.();
+  }
+
+  private binaryOverviewDirection(incoming: Vector3, separation: Vector3): Vector3 {
+    const axis = separation.normalize();
+    const sideways = incoming.clone().addScaledVector(axis, -incoming.dot(axis));
+    if (sideways.lengthSq() < 0.01) sideways.copy(this.universe.current.star.pole)
+      .addScaledVector(axis, -this.universe.current.star.pole.dot(axis));
+    if (sideways.lengthSq() < 0.01) sideways.crossVectors(axis, Math.abs(axis.y) < 0.9
+      ? new Vector3(0, 1, 0) : new Vector3(1, 0, 0));
+    // A different real line of sight keeps the Large Magellanic Cloud's broad
+    // sprite out of the A/B establishing composition. No stellar scale changes.
+    return sideways.normalize().applyAxisAngle(axis, 1.2);
   }
 
   private sunlitArrivalDirection(stop: Stop, proposed: Vector3, incoming: Vector3, distance: number, flightDuration: number): Vector3 {

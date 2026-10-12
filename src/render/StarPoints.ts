@@ -69,6 +69,10 @@ export class StarPoints {
         uReachTargetIndex: { value: -1 },
         uReachTargetOpacity: { value: 1 },
         uReachTargetDirection: { value: new Vector3(0, 0, 1) },
+        uReachSecondIndex: { value: -1 },
+        uReachSecondOpacity: { value: 1 },
+        uReachSecondDirection: { value: new Vector3(0, 0, 1) },
+        uReachTargetMaxPx: { value: 30 },
         uMagLimit: { value: 8.5 },
         uSoftness: { value: 0.0 },
       },
@@ -116,13 +120,19 @@ export class StarPoints {
    * @param hideIndex catalogue index of the current system's star
    */
   update(camPc: Vector3, hideIndex: number, reachTargetIndex = -1, reachTargetOpacity = 1,
-    reachTargetDirection: Vector3 | null = null): void {
+    reachTargetDirection: Vector3 | null = null,
+    secondTarget: { index: number; opacity: number; direction: Vector3 } | null = null): void {
     this.camPc.copy(camPc);
     this.mat.uniforms.uCamPc.value.copy(camPc);
     this.mat.uniforms.uHideIndex.value = hideIndex;
     this.mat.uniforms.uReachTargetIndex.value = reachTargetIndex;
     this.mat.uniforms.uReachTargetOpacity.value = reachTargetOpacity;
     if (reachTargetDirection) this.mat.uniforms.uReachTargetDirection.value.copy(reachTargetDirection).normalize();
+    this.mat.uniforms.uReachSecondIndex.value = secondTarget?.index ?? -1;
+    this.mat.uniforms.uReachSecondOpacity.value = secondTarget?.opacity ?? 1;
+    // The binary's two target points stay small in wide shots; labels identify them.
+    this.mat.uniforms.uReachTargetMaxPx.value = secondTarget ? 7 : 30;
+    if (secondTarget) this.mat.uniforms.uReachSecondDirection.value.copy(secondTarget.direction).normalize();
 
     // Named-star label candidates (bright from here)
     this.namedStars.length = 0;
