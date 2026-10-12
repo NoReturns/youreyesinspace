@@ -3,7 +3,23 @@ import { destinationRef, destinationSystem, type ReachRoute, type ReachStop } fr
 
 export const REACH_JOURNEY_KEY = 'the-reach:journey:v1';
 export const REACH_ITINERARY_ID = 'solar-system-41';
-export const REACH_ITINERARY_VERSION = 1;
+export const REACH_ITINERARY_VERSION = 3;
+const EXPANDED_STOP_IDS = new Set(['iss', 'hubble', 'jwst', 'juno', 'newhorizons', 'parker']);
+/** Authored version 2 order, retained solely to validate and finish saved legs. */
+const V2_STOP_IDS = [
+  'earth', 'iss', 'hubble', 'moon', 'jwst', 'mars', 'phobos', 'deimos', 'vesta', 'ceres',
+  'jupiter', 'juno', 'io', 'europa', 'ganymede', 'callisto', 'saturn', 'mimas', 'enceladus',
+  'tethys', 'dione', 'rhea', 'titan', 'iapetus', 'uranus', 'miranda', 'ariel', 'umbriel',
+  'titania', 'oberon', 'neptune', 'triton', 'pluto', 'charon', 'haumea', 'makemake',
+  'newhorizons', 'eris', 'pioneer11', 'pioneer10', 'voyager2', 'voyager1', 'halley',
+  'sun', 'parker', 'mercury', 'venus',
+] as const;
+const V1_STOP_IDS: readonly string[] = V2_STOP_IDS.filter((id) => !EXPANDED_STOP_IDS.has(id));
+export function previousReachStopId(version: 1 | 2, destinationId: string): string | null {
+  const ids: readonly string[] = version === 1 ? V1_STOP_IDS : V2_STOP_IDS;
+  const index = ids.indexOf(destinationId);
+  return index < 0 ? null : ids[(index - 1 + ids.length) % ids.length];
+}
 export const REACH_PROXIMA_PILOT_KEY = 'the-reach:journey:pilot-proxima:v4';
 
 export type Vec3 = [number, number, number];
@@ -36,6 +52,8 @@ export interface ReachJourneyState {
   itinerary: { id: string; version: number };
   destinationId: string;
   routeIndex: number;
+  /** Original route for a saved departure/cruise still crossing a v3 reorder boundary. */
+  transitionFromVersion?: 1 | 2;
   phase: JourneyPhase;
   simulation: { jd: number; rate: number };
   frame: { starId: string };
@@ -85,13 +103,19 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
   const routeVersion = Array.isArray(routeInput) ? REACH_ITINERARY_VERSION : (routeInput as ReachRoute).version;
   let state: unknown;
   try { state = JSON.parse(raw); } catch { return null; }
+  const sourceVersion = record(state) && record(state.itinerary) ? state.itinerary.version : null;
+  const migrating = routeId === REACH_ITINERARY_ID && routeVersion === 3
+    && (sourceVersion === 1 || sourceVersion === 2);
+  const sourceIds: readonly string[] = migrating
+    ? sourceVersion === 1 ? V1_STOP_IDS : V2_STOP_IDS : route.map((stop) => stop.id);
   const destination = record(state) && typeof state.destinationId === 'string'
     ? route.find((stop) => stop.id === state.destinationId) : undefined;
   if (!record(state) || state.schema !== 1 || !record(state.itinerary)
-    || state.itinerary.id !== routeId || state.itinerary.version !== routeVersion
+    || state.itinerary.id !== routeId || (!migrating && sourceVersion !== routeVersion)
     || typeof state.destinationId !== 'string' || !destination
     || !hasBody(state.destinationId) || !Number.isInteger(state.routeIndex) || !finite(state.routeIndex)
-    || state.routeIndex < 0 || state.routeIndex >= route.length
+    || state.routeIndex < 0 || state.routeIndex >= sourceIds.length
+    || sourceIds[state.routeIndex] !== state.destinationId
     || !record(state.simulation) || !finite(state.simulation.jd)
     || state.simulation.jd < 2_000_000 || state.simulation.jd > 3_000_000
     || !finite(state.simulation.rate) || state.simulation.rate <= 0 || state.simulation.rate > 1_000_000
@@ -105,6 +129,20 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
     || !progress(state.phase.elapsed, state.phase.duration)) return null;
 
   const phase = state.phase;
+  const transitionVersion = migrating && (phase.kind === 'departure' || phase.kind === 'cruise') ? sourceVersion
+    : state.transitionFromVersion === 1 || state.transitionFromVersion === 2
+      ? state.transitionFromVersion : null;
+  if (state.transitionFromVersion !== undefined && (migrating || transitionVersion === null)) return null;
+  if (transitionVersion !== null && phase.kind !== 'departure' && phase.kind !== 'cruise') return null;
+  const transitionIds: readonly string[] = transitionVersion === 1 ? V1_STOP_IDS : V2_STOP_IDS;
+  const predecessor = (ids: readonly string[], id: string): string | null => {
+    const index = ids.indexOf(id);
+    return index < 0 ? null : ids[(index - 1 + ids.length) % ids.length];
+  };
+  const successor = (ids: readonly string[], id: string): string | null => {
+    const index = ids.indexOf(id);
+    return index < 0 ? null : ids[(index + 1) % ids.length];
+  };
   const currentRef = destinationRef(destination);
   const expectedBodyId = currentRef.kind === 'star' ? `s${currentRef.starId.slice(1)}-star` : currentRef.bodyId;
   const expectedFrame = destinationSystem(destination);
@@ -119,6 +157,7 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
   } else if (phase.kind === 'departure') {
     if (phase.sourceId !== expectedBodyId || typeof phase.nextId !== 'string'
       || !route.some((stop) => stop.id === phase.nextId) || !hasBody(phase.nextId)
+      || phase.nextId !== successor(transitionVersion === null ? sourceIds : transitionIds, state.destinationId)
       || !nonzeroVec(phase.offset) || !quat(phase.orientation) || !unit(phase.up)
       || !finite(phase.orbitRate) || Math.abs(phase.orbitRate) > 1
       || !finite(phase.radialSpeed) || !finite(phase.endRadius) || phase.endRadius <= 0 || phase.endRadius >= 1e15
@@ -146,20 +185,35 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
         || !finite(odometer.leg.distanceKm) || odometer.leg.distanceKm < 0 || odometer.leg.distanceKm > 1e25
         || !finite(odometer.leg.departureJd) || odometer.leg.departureJd < 2_000_000
         || odometer.leg.departureJd > 3_000_000))) return null;
-    const expectedFrom = route[(route.findIndex((stop) => stop.id === state.destinationId) - 1 + route.length) % route.length].id;
     if (phase.kind === 'departure' ? !record(odometer.leg) || odometer.leg.fromId !== state.destinationId
       || odometer.leg.toId !== phase.nextId
-      : phase.kind === 'cruise' ? !record(odometer.leg) || odometer.leg.fromId !== expectedFrom
+      : phase.kind === 'cruise' ? !record(odometer.leg)
+        || odometer.leg.fromId !== predecessor(transitionVersion === null ? sourceIds : transitionIds,
+          state.destinationId)
         || odometer.leg.toId !== state.destinationId
         : odometer.leg !== null) return null;
   }
 
-  return state as unknown as ReachJourneyState;
+  const parsed = state as unknown as ReachJourneyState;
+  return migrating ? { ...parsed, itinerary: { id: routeId, version: routeVersion },
+    routeIndex: route.findIndex((stop) => stop.id === parsed.destinationId),
+    ...((phase.kind === 'departure' || phase.kind === 'cruise')
+      ? { transitionFromVersion: sourceVersion as 1 | 2 } : {}) } : parsed;
 }
 
 export function loadReachJourney(store: ReachJourneyStore, route: readonly ReachRouteStop[] | ReachRoute,
   hasBody: (id: string) => boolean): ReachJourneyState | null {
   try { return parseReachJourney(store.read(), route, hasBody); } catch { return null; }
+}
+
+/** A rejected checkpoint remains in storage for recovery instead of being replaced by a fresh voyage. */
+export function inspectReachJourneyStore(store: ReachJourneyStore, route: ReachRoute,
+  hasBody: (id: string) => boolean): { state: ReachJourneyState | null; canWrite: boolean } {
+  try {
+    const raw = store.read();
+    const state = parseReachJourney(raw, route, hasBody);
+    return { state, canWrite: raw === null || state !== null };
+  } catch { return { state: null, canWrite: false }; }
 }
 
 export function saveReachJourney(store: ReachJourneyStore, state: ReachJourneyState): boolean {

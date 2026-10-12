@@ -8,11 +8,12 @@ import type { Universe } from '../core/Universe';
 import { SOLAR_SYSTEM } from '../data/solarSystem';
 import {
   REACH_ITINERARY_ID, REACH_ITINERARY_VERSION,
+  previousReachStopId,
   type JourneyPhase, type Quat, type ReachFlightState, type ReachJourneyState, type Vec3,
 } from './JourneyState';
 import { ReachTiming } from './ReachTiming';
 import { geometricLegKm, type ReachDistanceLeg } from './ReachOdometer';
-import { destinationRef, destinationSystem, type ReachRoute, type ReachStop } from './ReachDestinations';
+import { destinationRef, destinationSystem, REACH_PROXIMA_PILOT, type ReachRoute, type ReachStop } from './ReachDestinations';
 import { reachArrivalTraceEnabled } from './ReachArrivalTrace';
 
 type Stop = ReachStop;
@@ -20,13 +21,21 @@ type Stop = ReachStop;
 // Route order and presentation profile only. Durations come from ReachTiming.
 export const REACH_ITINERARY: readonly Stop[] = [
   { id: 'earth', profile: 'planet' },
+  { id: 'iss', profile: 'probe' },
+  { id: 'hubble', profile: 'probe' },
   { id: 'moon', profile: 'moon' },
+  { id: 'jwst', profile: 'probe' },
+  { id: 'sun', profile: 'sun' },
+  { id: 'parker', profile: 'probe' },
+  { id: 'mercury', profile: 'planet' },
+  { id: 'venus', profile: 'planet' },
   { id: 'mars', profile: 'planet' },
   { id: 'phobos', profile: 'moon' },
   { id: 'deimos', profile: 'moon' },
   { id: 'vesta', profile: 'small' },
   { id: 'ceres', profile: 'planet' },
   { id: 'jupiter', profile: 'planet' },
+  { id: 'juno', profile: 'probe' },
   { id: 'io', profile: 'moon' },
   { id: 'europa', profile: 'moon' },
   { id: 'ganymede', profile: 'moon' },
@@ -39,6 +48,7 @@ export const REACH_ITINERARY: readonly Stop[] = [
   { id: 'rhea', profile: 'moon' },
   { id: 'titan', profile: 'moon' },
   { id: 'iapetus', profile: 'moon' },
+  { id: 'halley', profile: 'small' },
   { id: 'uranus', profile: 'planet' },
   { id: 'miranda', profile: 'moon' },
   { id: 'ariel', profile: 'moon' },
@@ -51,20 +61,28 @@ export const REACH_ITINERARY: readonly Stop[] = [
   { id: 'charon', profile: 'moon' },
   { id: 'haumea', profile: 'planet' },
   { id: 'makemake', profile: 'planet' },
+  { id: 'newhorizons', profile: 'probe' },
   { id: 'eris', profile: 'planet' },
   { id: 'pioneer11', profile: 'probe' },
   { id: 'pioneer10', profile: 'probe' },
   { id: 'voyager2', profile: 'probe' },
   { id: 'voyager1', profile: 'probe' },
-  { id: 'halley', profile: 'small' },
-  { id: 'sun', profile: 'sun' },
-  { id: 'mercury', profile: 'planet' },
-  { id: 'venus', profile: 'planet' },
 ];
 
 export const REACH_PRODUCTION_ROUTE: ReachRoute = {
   id: REACH_ITINERARY_ID, version: REACH_ITINERARY_VERSION, stops: REACH_ITINERARY, repeat: true,
 };
+
+/** Development-only caller supplies a selected production stop; this route has no persistence key. */
+export function reachPreviewRoute(id: string): ReachRoute | null {
+  if (id === 'proxima') return {
+    id: 'preview:proxima', version: 1, stops: REACH_PROXIMA_PILOT.stops, repeat: false,
+  };
+  const stop = REACH_ITINERARY.find((candidate) => candidate.id === id);
+  if (!stop) return null;
+  return { id: `preview:${id}`, version: 1,
+    stops: id === 'earth' ? [REACH_ITINERARY[0]] : [REACH_ITINERARY[0], stop], repeat: false };
+}
 
 const OBSERVATION_ORBIT = 0.012;
 const MOON_FLYBY_RATE = 0.025;
@@ -86,6 +104,7 @@ export class ReachVoyageDirector {
   private observeDuration = 0;
   private completedKm = 0;
   private roundTripCount = 0;
+  private transitionFromVersion: 1 | 2 | null = null;
   private leg: ReachDistanceLeg | null = null;
   private flyby: {
     body: CelestialBody; offset: Vector3; orientation: Quaternion; up: Vector3;
@@ -99,6 +118,14 @@ export class ReachVoyageDirector {
 
   get directing(): boolean { return this.stage === 'departure' || this.stage === 'flyby'; }
   get roundTrips(): number { return this.roundTripCount; }
+  get countdownLabel(): string {
+    const id = this.countdown.destinationId;
+    const stop = this.stops.find((candidate) => candidate.id === id);
+    return stop?.label ?? id;
+  }
+  get terminalObservation(): boolean {
+    return !this.route.repeat && this.stop === this.stops.length - 1 && this.stage === 'observe';
+  }
   get distanceTravelledKm(): number {
     const flight = this.stage === 'cruise' ? this.camera.autopilot : null;
     const progress = flight && flight.duration > 0 ? Math.min(1, Math.max(0, flight.t / flight.duration)) : 0;
@@ -169,6 +196,8 @@ export class ReachVoyageDirector {
     return {
       schema: 1, itinerary: { id: this.route.id, version: this.route.version },
       destinationId: current.id, routeIndex: this.stop, phase,
+      ...(this.transitionFromVersion && (this.stage === 'departure' || this.stage === 'cruise')
+        ? { transitionFromVersion: this.transitionFromVersion } : {}),
       simulation: { jd: this.time.jd, rate: this.time.rate },
       frame: { starId: this.universe.current.starId },
       odometer: { completedKm: this.completedKm, roundTrips: this.roundTripCount,
@@ -182,10 +211,13 @@ export class ReachVoyageDirector {
     this.stop = this.stops.findIndex((stop) => stop.id === saved.destinationId);
     this.completedKm = saved.odometer?.completedKm ?? 0;
     this.roundTripCount = saved.odometer?.roundTrips ?? 0;
+    this.transitionFromVersion = saved.transitionFromVersion ?? null;
     this.leg = saved.odometer?.leg ? { ...saved.odometer.leg } : null;
     if (!saved.odometer && (saved.phase.kind === 'departure' || saved.phase.kind === 'cruise')) {
       const fromId = saved.phase.kind === 'departure' ? saved.destinationId
-        : this.stops[(this.stop - 1 + this.stops.length) % this.stops.length].id;
+        : (this.transitionFromVersion
+          ? previousReachStopId(this.transitionFromVersion, saved.destinationId)
+          : this.stops[(this.stop - 1 + this.stops.length) % this.stops.length].id)!;
       const toId = saved.phase.kind === 'departure' ? saved.phase.nextId : saved.destinationId;
       this.leg = this.makeLeg(fromId, toId);
     }
@@ -238,6 +270,7 @@ export class ReachVoyageDirector {
         this.completedKm += this.leg.distanceKm;
         this.leg = null;
       }
+      this.transitionFromVersion = null;
       const stop = this.stops[this.stop];
       if (stop.profile === 'moon') {
         const body = this.body(stop.id);
@@ -276,6 +309,7 @@ export class ReachVoyageDirector {
   }
 
   private beginDeparture(radialSpeed: number, orbitRate: number): void {
+    this.transitionFromVersion = null;
     const source = this.destination(this.stops[this.stop]);
     const next = (this.stop + 1) % this.stops.length;
     this.leg = this.makeLeg(this.stops[this.stop].id, this.stops[next].id);
@@ -339,7 +373,8 @@ export class ReachVoyageDirector {
     const approach = stop.profile === 'moon' && destination.parent
       ? new Vector3().subVectors(destination.position, destination.parent.position).normalize()
       : fromDestination;
-    const distance = stop.profile === 'star' || stop.profile === 'sun' ? destination.radius * 40
+    const distance = stop.profile === 'star' || stop.profile === 'sun'
+      ? destination.radius * (stop.starPresentation?.observationDistanceRadii ?? 40)
       : stop.profile === 'probe' ? destination.radius * 4.5
       : stop.profile === 'moon' ? destination.radius * 5
       : Math.max(destination.radius * 3.6, (destination.data.rings?.outer ?? 0) * 2.2);

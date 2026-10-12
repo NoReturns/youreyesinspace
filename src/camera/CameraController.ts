@@ -345,6 +345,17 @@ export class CameraController {
           dir = _v2.copy(from).multiplyScalar(Math.sin((1 - s) * ang) / sa).addScaledVector(ap.dir1, Math.sin(s * ang) / sa);
         }
         this.position.copy(tgtPos).addScaledVector(dir, dist);
+        // An orbital spacecraft can be across its parent from the previous stop.
+        // Keep the interpolated close approach outside the parent's solid surface.
+        if (ap.kind === 'goto' && tgt?.data.type === 'spacecraft'
+          && tgt.data.orbit?.kind === 'simple' && tgt.parent) {
+          const clear = _v.copy(this.position).sub(tgt.parent.position);
+          const minimum = tgt.parent.radius * 1.005;
+          if (clear.lengthSq() < minimum * minimum) {
+            if (clear.lengthSq() < 1e-12) clear.copy(tgt.position).sub(tgt.parent.position);
+            this.position.copy(tgt.parent.position).add(clear.setLength(minimum));
+          }
+        }
         // orientation: blend toward looking at target
         _m.lookAt(new Vector3(), _v.copy(tgtPos).sub(this.position), ap.up1 ? _v2.copy(ap.up1) : _v2.set(0, 1, 0).applyQuaternion(ap.q0));
         _q.setFromRotationMatrix(_m);

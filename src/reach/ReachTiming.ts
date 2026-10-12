@@ -1,4 +1,4 @@
-export type ReachTimingMode = 'test' | 'production';
+export type ReachTimingMode = 'test' | 'production' | 'preview';
 export type ReachProfile = 'planet' | 'moon' | 'small' | 'probe' | 'sun' | 'star';
 export type ReachTravelKind = 'moon' | 'planet' | 'distant' | 'probe' | 'interstellar';
 export interface ReachTimingDestination { id: string; profile: ReachProfile }
@@ -11,6 +11,11 @@ export interface ReachTimingConfig {
 }
 
 export const REACH_TIMING: Record<ReachTimingMode, ReachTimingConfig> = {
+  preview: {
+    travel: { moon: [8, 8], planet: [8, 8], distant: [8, 8], probe: [8, 8], interstellar: [8, 8] },
+    observe: { planet: [6, 6], moon: [6, 6], small: [6, 6], probe: [6, 6], sun: [6, 6], star: [6, 6] },
+    departure: { fullSeconds: 2, moonSeconds: 2 },
+  },
   test: {
     travel: { moon: [30, 30], planet: [30, 30], distant: [30, 30], probe: [30, 30], interstellar: [28, 28] },
     observe: { planet: [8, 8], moon: [8, 8], small: [8, 8], probe: [8, 8], sun: [8, 8], star: [8, 8] },

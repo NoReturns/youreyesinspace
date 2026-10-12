@@ -7,6 +7,14 @@ export type ReachDestinationRef =
 export interface ReachStop extends ReachTimingDestination {
   /** Stable route identity; legacy Solar stops retain their existing body IDs. */
   ref?: ReachDestinationRef;
+  label?: string;
+  /** Optional encounter presentation; physical catalogue properties remain authoritative. */
+  starPresentation?: {
+    observationDistanceRadii: number;
+    surfaceMotion: number;
+    coronaMotion: number;
+    colorWarmth: number;
+  };
 }
 
 export interface ReachRoute {
@@ -20,7 +28,9 @@ export const REACH_PROXIMA_PILOT: ReachRoute = {
   id: 'pilot-proxima', version: 4, repeat: false,
   stops: [
     { id: 'earth', profile: 'planet', ref: { kind: 'body', systemId: 'c0', bodyId: 'earth' } },
-    { id: 'star:c64548', profile: 'star', ref: { kind: 'star', starId: 'c64548' } },
+    { id: 'star:c64548', profile: 'star', label: 'Proxima Centauri',
+      ref: { kind: 'star', starId: 'c64548' },
+      starPresentation: { observationDistanceRadii: 6.95, surfaceMotion: 1, coronaMotion: 0.35, colorWarmth: 0.85 } },
   ],
 };
 
@@ -31,6 +41,11 @@ export function destinationRef(stop: ReachStop): ReachDestinationRef {
 export function destinationSystem(stop: ReachStop): string {
   const ref = destinationRef(stop);
   return ref.kind === 'star' ? ref.starId : ref.systemId;
+}
+
+/** Bounded wall-clock drift: stable through simulation rate changes and shared by panorama windows. */
+export function reachStarVisualDrift(seconds: number): [number, number, number] {
+  return [Math.sin(seconds * 0.045), Math.cos(seconds * 0.061), Math.sin(seconds * 0.037 + 0.8)];
 }
 
 /** Keep the pilot target's catalogue point until its local disc is clearly visible. */
@@ -47,14 +62,15 @@ export function reachPilotStarBlend(starRadiusPx: number): number {
 /** Pilot-only point/corona presentation. The isolation mode leaves the star renderer untouched. */
 export function reachPilotStarAppearance(index: number, starRadiusPx: number,
   pilotCruise: boolean, disableCoronaBlend: boolean): {
-    hideIndex: number; targetIndex: number; pointOpacity: number; coronaScale: number;
+    hideIndex: number; targetIndex: number; pointOpacity: number; coronaScale: number; discScale: number;
   } {
   const hideIndex = reachPilotStarHideIndex(index, starRadiusPx, pilotCruise);
-  if (!pilotCruise) return { hideIndex, targetIndex: -1, pointOpacity: 1, coronaScale: 1 };
+  if (!pilotCruise) return { hideIndex, targetIndex: -1, pointOpacity: 1, coronaScale: 1, discScale: 1 };
   const blend = disableCoronaBlend ? 0 : reachPilotStarBlend(starRadiusPx);
   return {
     hideIndex, targetIndex: hideIndex === -1 ? index : -1,
     pointOpacity: disableCoronaBlend ? 1 : 1 - blend,
     coronaScale: disableCoronaBlend ? 1 : blend,
+    discScale: disableCoronaBlend ? 1 : blend,
   };
 }

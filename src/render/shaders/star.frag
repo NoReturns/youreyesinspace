@@ -4,6 +4,9 @@ uniform float uSeed;
 uniform float uTime;
 uniform float uTemperature;
 uniform float uIntensity;
+uniform vec3 uDrift;
+uniform float uMotionStrength;
+uniform float uColorWarmth;
 
 varying vec3 vObjPos;
 varying vec3 vWorldPos;
@@ -19,16 +22,17 @@ void main() {
 
   // Granulation: multi-scale animated noise
   float t = uTime * 0.05;
-  float g1 = fbm(p * 12.0 + uSeed + vec3(t, -t * 0.7, t * 0.3), 4);
-  float g2 = fbm(p * 45.0 - uSeed + vec3(-t * 1.3, t, t * 0.5), 3);
-  float g3 = snoise(p * 140.0 + vec3(t * 2.0));
+  vec3 drift = uDrift * uMotionStrength;
+  float g1 = fbm(p * 12.0 + uSeed + vec3(t, -t * 0.7, t * 0.3) + drift, 4);
+  float g2 = fbm(p * 45.0 - uSeed + vec3(-t * 1.3, t, t * 0.5) - drift * 1.3, 3);
+  float g3 = snoise(p * 140.0 + vec3(t * 2.0) + drift * 2.0);
   // Granulation cells: bright centres, dark inter-granular lanes
   float cells = 1.0 - abs(g2) * 1.6;
   float gran = 0.62 + 0.30 * g1 + 0.28 * cells + 0.06 * g3;
   gran = clamp(gran, 0.3, 1.25);
 
   // Sunspots: dark umbra + penumbra that slowly drift
-  float spotField = fbm(p * 5.0 + uSeed * 3.0 + vec3(t * 0.15), 3) * 0.5 + 0.5;
+  float spotField = fbm(p * 5.0 + uSeed * 3.0 + vec3(t * 0.15) + drift * 0.15, 3) * 0.5 + 0.5;
   float spots = smoothstep(0.74, 0.86, spotField);
   float penumbra = smoothstep(0.66, 0.76, spotField) - spots;
   gran *= 1.0 - spots * 0.88;
@@ -50,6 +54,7 @@ void main() {
   // Saturation boost: ACES + bloom pull bright surfaces toward white, so push hue back
   float lum = dot(color, vec3(0.299, 0.587, 0.114));
   color = max(mix(vec3(lum), color, 1.6), 0.0);
+  color *= vec3(1.0, 1.0 - 0.6 * uColorWarmth, 1.0 - 0.7 * uColorWarmth);
 
   // Hotter photospheres are brighter per unit area (kept mild: tone mapping would clip anyway)
   color *= uIntensity * mix(0.85, 1.45, smoothstep(3000.0, 12000.0, uTemperature));

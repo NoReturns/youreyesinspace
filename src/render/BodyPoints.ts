@@ -55,7 +55,7 @@ export class BodyPoints {
   }
 
   /** @param starLuminosity luminosity of the system's star in solar units (scales reflected brightness) */
-  update(sunPos: Vector3, camPos: Vector3, starLuminosity = 1): void {
+  update(sunPos: Vector3, camPos: Vector3, starLuminosity = 1, hideNonStars = false): void {
     const views = this.views;
     if (!views.length) return;
     for (let i = 0; i < views.length; i++) {
@@ -67,7 +67,7 @@ export class BodyPoints {
       this.pos[i * 3 + 1] = rp.y;
       this.pos[i * 3 + 2] = rp.z;
 
-      if (b.data.type === 'star' || b.data.type === 'spacecraft' || b.data.type === 'pulsar' || b.data.type === 'barycenter') {
+      if (hideNonStars || b.data.type === 'star' || b.data.type === 'spacecraft' || b.data.type === 'pulsar' || b.data.type === 'barycenter') {
         this.alpha[i] = 0;
         this.size[i] = 0;
         continue;

@@ -5,14 +5,15 @@ import { rolldown } from 'rolldown';
 import * as THREE from 'three';
 
 const entry = `
-  export { ReachVoyageDirector } from './src/reach/ReachVoyageDirector.ts';
-  export { REACH_PROXIMA_PILOT, reachPilotStarBlend, reachPilotStarHideIndex,
+  export { ReachVoyageDirector, reachPreviewRoute } from './src/reach/ReachVoyageDirector.ts';
+  export { REACH_PROXIMA_PILOT, reachPilotStarBlend, reachPilotStarHideIndex, reachStarVisualDrift,
     reachPilotStarAppearance } from './src/reach/ReachDestinations.ts';
   export { CameraController } from './src/camera/CameraController.ts';
   export { TimeSystem } from './src/core/TimeSystem.ts';
   export { Universe } from './src/core/Universe.ts';
   export { StarCatalog } from './src/data/StarCatalog.ts';
   export { StarPoints } from './src/render/StarPoints.ts';
+  export { BodyPoints } from './src/render/BodyPoints.ts';
   export { ReachTiming, REACH_TIMING } from './src/reach/ReachTiming.ts';
   export { ReachOdometerOverlay, readOdometerContract, formatVoyageDistance, resolveOdometerPosition } from './src/reach/ReachOdometer.ts';
   export { readCountdownContract } from './src/reach/ReachCountdownOverlay.ts';
@@ -42,12 +43,22 @@ const module = { exports: {} };
 new Function('require', 'module', 'exports', output.output[0].code)(
   (id) => id === 'three' ? THREE : { _: (text) => text, fixed: String, localeTag: () => 'en' }, module, module.exports,
 );
-const { ReachVoyageDirector, REACH_PROXIMA_PILOT, reachPilotStarBlend, reachPilotStarHideIndex,
+const { ReachVoyageDirector, reachPreviewRoute, REACH_PROXIMA_PILOT, reachPilotStarBlend, reachPilotStarHideIndex,
+  reachStarVisualDrift,
   reachPilotStarAppearance, CameraController, TimeSystem,
-  Universe, StarCatalog, StarPoints, ReachTiming, REACH_TIMING, ReachOdometerOverlay, readOdometerContract,
+  Universe, StarCatalog, StarPoints, BodyPoints, ReachTiming, REACH_TIMING, ReachOdometerOverlay, readOdometerContract,
   formatVoyageDistance, resolveOdometerPosition, readCountdownContract,
   parseReachJourney, PARSEC_KM, ReachArrivalTrace,
   suppressProximaPlanetMeshes, preparePlanetResources } = module.exports;
+const pointLayer = new BodyPoints(new THREE.Scene());
+pointLayer.setViews([{ body: { id: 'planet', data: { type: 'planet', albedo: 0.9,
+  appearance: { kind: 'terrestrial', landMid: [0.7, 0.6, 0.5] } },
+  radius: 1000, position: new THREE.Vector3(1000, 0, 0) },
+  relPos: new THREE.Vector3(1000, 0, 0), distance: 1000, apparentRadiusPx: 0.1 }]);
+pointLayer.update(new THREE.Vector3(), new THREE.Vector3(), 1);
+assert.ok(pointLayer.points.geometry.attributes.alpha.array[0] > 0, 'ordinary generated points remain available');
+pointLayer.update(new THREE.Vector3(), new THREE.Vector3(), 1, true);
+assert.equal(pointLayer.points.geometry.attributes.alpha.array[0], 0, 'the encounter hides incidental points');
 const starView = { body: { id: 's64548-star' }, group: { visible: true },
   atmosphere: undefined, meshVisible: true };
 const planetView = { body: { id: 's64548-p6' }, group: { visible: true },
@@ -154,27 +165,49 @@ assert.equal(blended.hideIndex, isolated.hideIndex, 'isolation retains the pilot
 assert.equal(isolated.targetIndex, 64548, 'isolation keeps the distant catalogue point');
 assert.equal(isolated.pointOpacity, 1, 'isolation does not fade the catalogue point');
 assert.equal(isolated.coronaScale, 1, 'isolation leaves the ordinary corona intensity alone');
-assert.ok(blended.pointOpacity < 1 && blended.coronaScale < 1, 'default pilot blend remains active');
+assert.ok(blended.pointOpacity < 1 && blended.coronaScale < 1 && blended.discScale < 1,
+  'point, corona, and disc share the same handoff');
+assert.equal(blended.pointOpacity + blended.discScale, 1, 'handoff has no duplicate full-strength star');
+assert.equal(reachPilotStarAppearance(64548, 0.15, true, false).discScale, 0,
+  'the unresolved local disc does not duplicate the catalogue point');
+assert.equal(reachPilotStarAppearance(64548, 1.5, true, false).discScale, 1,
+  'the resolved local disc is fully visible when the catalogue point disappears');
 assert.equal(reachPilotStarAppearance(64548, 1.5, true, true).hideIndex, 64548,
   'isolation still removes the point when the local disc resolves');
 assert.deepEqual(reachPilotStarAppearance(0, 0.82, false, true),
-  { hideIndex: 0, targetIndex: -1, pointOpacity: 1, coronaScale: 1 },
+  { hideIndex: 0, targetIndex: -1, pointOpacity: 1, coronaScale: 1, discScale: 1 },
   'isolation cannot change ordinary global star rendering');
 const pilot = REACH_PROXIMA_PILOT;
+const proximaPresentation = pilot.stops[1].starPresentation;
+assert.ok(proximaPresentation, 'the pilot alone owns the closer star presentation');
+assert.equal(proximaPresentation.observationDistanceRadii, 6.95);
+assert.ok(proximaPresentation.surfaceMotion > 0 && proximaPresentation.coronaMotion > 0);
+assert.ok(proximaPresentation.colorWarmth > 0 && proximaPresentation.colorWarmth <= 1);
+const visualEpoch = 1_791_763_200;
+const driftStart = reachStarVisualDrift(visualEpoch);
+const driftNextFrame = reachStarVisualDrift(visualEpoch + 1 / 60);
+const driftAfterObservation = reachStarVisualDrift(visualEpoch + 6);
+assert.deepEqual(reachStarVisualDrift(visualEpoch), driftStart,
+  'panorama windows receive the same visual phase at the same wall-clock time');
+assert.ok(driftStart.every((value) => Number.isFinite(value) && Math.abs(value) <= 1));
+assert.ok(driftStart.every((value, index) => Math.abs(value - driftNextFrame[index]) < 0.002),
+  'the visual phase changes smoothly between frames');
+assert.ok(driftStart.some((value, index) => Math.abs(value - driftAfterObservation[index]) > 0.03),
+  'the surface changes over the six-second observation');
 const hasDestination = (universe) => (id) => {
   if (id === 'earth') return !!universe.system('c0').get('earth');
   if (id === 'star:c64548') return !!universe.system('c64548').star;
   return !!universe.system('c0').get(id) || !!universe.system('c64548').get(id);
 };
 const input = { flush: () => ({ dx: 0, dy: 0, wheel: 0, pinch: 0, panX: 0, panY: 0 }), down: () => false };
-function makeRun(saved = null) {
+function makeRun(saved = null, route = pilot, timingMode = 'test') {
   const time = new TimeSystem(new Date('2026-10-10T00:00:00Z'));
   if (saved) { time.setRate(saved.simulation.rate); time.jd = saved.simulation.jd; }
   const universe = new Universe(catalog);
   if (saved && saved.frame.starId !== 'c0') universe.switchTo(saved.frame.starId, time.jd, time.t);
   universe.update(time.jd, time.t);
   const camera = new CameraController(universe);
-  const director = new ReachVoyageDirector(universe, camera, time, new ReachTiming('test'), saved, undefined, pilot);
+  const director = new ReachVoyageDirector(universe, camera, time, new ReachTiming(timingMode), saved, undefined, route);
   return { universe, camera, director, time };
 }
 function step(run) {
@@ -294,4 +327,71 @@ assert.equal(parseReachJourney(JSON.stringify(invalid), pilot, hasDestination(re
 assert.equal(parseReachJourney(JSON.stringify({ ...cruise, frame: { starId: 'c0' } }),
   pilot, hasDestination(resumedCruise.universe)), null);
 assert.equal(parseReachJourney(JSON.stringify(cruise), pilot, () => false), null);
+const preview = reachPreviewRoute('proxima');
+assert.ok(preview && preview !== pilot && preview.stops === pilot.stops);
+assert.equal(preview.id, 'preview:proxima');
+assert.equal(preview.repeat, false);
+assert.equal(reachPreviewRoute('alpha-centauri'), null);
+const shortRun = makeRun(null, preview, 'preview');
+const shortDeparture = until(shortRun, (s) => s.phase.kind === 'departure');
+assert.equal(shortDeparture.phase.duration, 2);
+assert.equal(shortDeparture.odometer.leg.toId, 'star:c64548');
+const shortCruise = until(shortRun, (s) => s.phase.kind === 'cruise');
+assert.equal(shortCruise.phase.duration, 8);
+assert.equal(shortCruise.frame.starId, 'c64548');
+assert.equal(shortCruise.camera.referenceId, 's64548-star');
+assert.ok(shortRun.camera.position.distanceTo(shortRun.universe.star.position) > shortRun.universe.star.radius,
+  'the preview camera remains outside the star after the frame switch');
+assert.equal(shortRun.camera.autopilot.dist1,
+  shortRun.universe.star.radius * proximaPresentation.observationDistanceRadii,
+  'the generalized star flight uses the stop-specific observation distance');
+let previousStarDistance = shortRun.camera.position.distanceTo(shortRun.universe.star.position);
+for (let i = 0; i < 40; i++) {
+  step(shortRun);
+  const starDistance = shortRun.camera.position.distanceTo(shortRun.universe.star.position);
+  assert.ok(starDistance <= previousStarDistance * (1 + 1e-12), 'approach distance decreases continuously');
+  assert.ok(starDistance > shortRun.universe.star.radius * 4.5,
+    'the camera stays outside the rendered corona extent');
+  previousStarDistance = starDistance;
+  const toStar = shortRun.universe.star.position.clone().sub(shortRun.camera.position).normalize();
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(shortRun.camera.quaternion);
+  assert.ok(forward.angleTo(toStar) < 0.1, 'the star stays inside the approach framing');
+}
+let shortArrival = null;
+for (let i = 0; i < 80 && !shortArrival; i++) {
+  step(shortRun);
+  const starDistance = shortRun.camera.position.distanceTo(shortRun.universe.star.position);
+  assert.ok(starDistance <= previousStarDistance * (1 + 1e-12),
+    'the final approach does not reverse or jump outward');
+  assert.ok(starDistance > shortRun.universe.star.radius * 4.5,
+    'the final approach remains outside the rendered corona');
+  previousStarDistance = starDistance;
+  const toStar = shortRun.universe.star.position.clone().sub(shortRun.camera.position).normalize();
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(shortRun.camera.quaternion);
+  assert.ok(forward.angleTo(toStar) < 0.1, 'the star remains framed through arrival');
+  const saved = shortRun.director.capture();
+  if (saved.phase.kind === 'observe' && saved.destinationId === 'star:c64548') shortArrival = saved;
+}
+assert.ok(shortArrival, 'the short preview reaches Proxima observation');
+assert.equal(shortArrival.phase.duration, 6);
+assert.equal(shortRun.director.countdownLabel, 'Proxima Centauri');
+assert.equal(shortRun.director.terminalObservation, true);
+assert.equal(shortArrival.odometer.completedKm, shortDeparture.odometer.leg.distanceKm);
+const arrivalRadii = shortRun.camera.position.distanceTo(shortRun.universe.star.position)
+  / shortRun.universe.star.radius;
+assert.ok(Math.abs(arrivalRadii - proximaPresentation.observationDistanceRadii) < 0.01,
+  'observation ends at the authored camera distance');
+assert.ok(arrivalRadii > 4.5, 'the observation camera remains outside the rendered corona');
+const discHeightFraction = 1 / (Math.sqrt(arrivalRadii ** 2 - 1) * Math.tan(50 * Math.PI / 360));
+assert.ok(discHeightFraction >= 0.30 && discHeightFraction <= 0.33,
+  `the 50-degree preview projects the disc to ${(discHeightFraction * 100).toFixed(1)}% of viewport height`);
+for (let i = 0; i < 100; i++) {
+  step(shortRun);
+  assert.ok(shortRun.camera.position.distanceTo(shortRun.universe.star.position)
+    > shortRun.universe.star.radius * 4.5, 'terminal observation stays outside the rendered corona');
+}
+assert.equal(shortRun.director.capture().destinationId, 'star:c64548', 'the preview stops after observation');
+assert.equal(shortRun.director.capture().odometer.leg, null);
+assert.equal(shortRun.director.roundTrips, 0);
 console.log('PASS real Proxima catalogue, Solar departure, frame switch, arrival, resume, distance, invalid recovery');
+console.log('PASS isolated short preview, handoff state, generated-body points, and terminal observation');

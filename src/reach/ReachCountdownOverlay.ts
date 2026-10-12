@@ -50,8 +50,11 @@ export class ReachCountdownOverlay {
     }
     if (now - this.lastUpdate < 1000) return;
     this.lastUpdate = now;
-    const name = countdown.destinationId.replace(/([a-z])(\d)/g, '$1 $2').toUpperCase();
-    const text = `${countdown.phase}: ${name} ${formatCountdown(countdown.secondsLeft)}`;
+    const name = this.director.countdownLabel.replace(/([a-z])(\d)/g, '$1 $2').toUpperCase();
+    const phase = this.director.terminalObservation
+      ? countdown.secondsLeft > 0 ? 'OBSERVE' : 'ARRIVED' : countdown.phase;
+    const text = phase === 'ARRIVED' ? `ARRIVED: ${name}`
+      : `${phase}: ${name} ${formatCountdown(countdown.secondsLeft)}`;
     if (this.element.textContent !== text) this.element.textContent = text;
   }
 }

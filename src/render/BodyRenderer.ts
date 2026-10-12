@@ -90,6 +90,11 @@ function loadModel(url: string): Promise<Group> {
   return p;
 }
 
+/** Share the existing model cache with development-only local encounters. */
+export function loadReachSpacecraftModel(url: string): Promise<Group> {
+  return loadModel(url).then((source) => source.clone(true));
+}
+
 export class BodyView {
   readonly body: CelestialBody;
   readonly group = new Group();
@@ -166,7 +171,8 @@ export class BodyView {
       this.surfaceMat = new ShaderMaterial({
         vertexShader: Shaders.surfaceVert,
         fragmentShader: Shaders.starFrag,
-        uniforms: { ...baseUniforms, uTemperature: { value: T }, uIntensity: { value: a.kind === 'pulsar' ? 1.8 : 0.75 } },
+        uniforms: { ...baseUniforms, uTemperature: { value: T }, uIntensity: { value: a.kind === 'pulsar' ? 1.8 : 0.75 },
+          uDrift: { value: new Vector3() }, uMotionStrength: { value: 0 }, uColorWarmth: { value: 0 } },
       });
       // Corona billboard, tinted by the photosphere temperature
       const [cr, cg, cb] = temperatureToRgb(T);
@@ -177,6 +183,9 @@ export class BodyView {
         fragmentShader: Shaders.coronaFrag,
         uniforms: {
           uTime: { value: 0 },
+          uDrift: { value: new Vector3() },
+          uMotionStrength: { value: 0 },
+          uColorWarmth: { value: 0 },
           uColor: { value: warm },
           uIntensity: { value: 1.0 },
           uCoreRadius: { value: 1 / 7 },

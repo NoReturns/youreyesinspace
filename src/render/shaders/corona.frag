@@ -4,6 +4,9 @@ uniform float uTime;
 uniform vec3 uColor;
 uniform float uIntensity;
 uniform float uCoreRadius; // fraction of quad half-size occupied by the star disc
+uniform vec3 uDrift;
+uniform float uMotionStrength;
+uniform float uColorWarmth;
 
 varying vec2 vUv;
 
@@ -16,8 +19,9 @@ void main() {
   float ang = atan(c.y, c.x);
 
   // Streamers
-  float streaks = fbm(vec3(ang * 3.0, r * 6.0 - uTime * 0.03, 1.0), 4) * 0.5 + 0.5;
-  float streaks2 = fbm(vec3(ang * 9.0 + 3.0, r * 14.0 - uTime * 0.02, 7.0), 3) * 0.5 + 0.5;
+  vec3 drift = uDrift * uMotionStrength;
+  float streaks = fbm(vec3(ang * 3.0, r * 6.0 - uTime * 0.03 + drift.x * 0.25, 1.0 + drift.y * 0.15), 4) * 0.5 + 0.5;
+  float streaks2 = fbm(vec3(ang * 9.0 + 3.0, r * 14.0 - uTime * 0.02 + drift.z * 0.2, 7.0 + drift.x * 0.1), 3) * 0.5 + 0.5;
 
   float rr = max(r - uCoreRadius, 0.0) / max(1.0 - uCoreRadius, 1e-3);
   // Inner corona: tight bright ring; outer: faint streamers
@@ -28,7 +32,8 @@ void main() {
   // slightly warmer toward the outside
   vec3 tint = mix(vec3(1.0), vec3(1.0, 0.8, 0.55), smoothstep(0.0, 0.6, rr));
 
-  vec3 col = uColor * tint * glow * uIntensity;
+  vec3 col = uColor * tint * glow * uIntensity
+    * vec3(1.0, 1.0 - 0.6 * uColorWarmth, 1.0 - 0.7 * uColorWarmth);
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

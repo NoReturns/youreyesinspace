@@ -23,19 +23,20 @@ import { Overlay, type StarSelectionScreen } from './render/Overlay';
 import type { NamedStarScreen } from './render/StarPoints';
 import { Input } from './input/Input';
 import { CameraController } from './camera/CameraController';
-import { ReachVoyageDirector, REACH_PRODUCTION_ROUTE } from './reach/ReachVoyageDirector';
-import { destinationRef, reachPilotStarAppearance, REACH_PROXIMA_PILOT } from './reach/ReachDestinations';
+import { ReachVoyageDirector, REACH_PRODUCTION_ROUTE, reachPreviewRoute } from './reach/ReachVoyageDirector';
+import { destinationRef, reachPilotStarAppearance, reachStarVisualDrift, REACH_PROXIMA_PILOT } from './reach/ReachDestinations';
 import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
 import { ReachOdometerOverlay, readOdometerContract } from './reach/ReachOdometer';
 import { ReachPanoramaSync, readReachPanorama } from './reach/ReachPanorama';
-import { LocalStorageReachJourneyStore, REACH_PROXIMA_PILOT_KEY, loadReachJourney, saveReachJourney, type ReachJourneyState, type ReachJourneyStore } from './reach/JourneyState';
+import { LocalStorageReachJourneyStore, REACH_PROXIMA_PILOT_KEY, inspectReachJourneyStore, saveReachJourney, type ReachJourneyState, type ReachJourneyStore } from './reach/JourneyState';
 import { ReachTiming } from './reach/ReachTiming';
 import { ReachArrivalTrace } from './reach/ReachArrivalTrace';
 import { suppressProximaPlanetMeshes } from './reach/ReachPlanetMeshIsolation';
 import { preparePlanetResources } from './reach/ReachPlanetResourcePreparation';
+import { PerseveranceSurfacePreview, marsPreviewDaylightJd } from './reach/PerseveranceSurfacePreview';
 import { UI, type UIHost } from './ui/UI';
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from './ui/Settings';
-import { DAY_S, DEG, PARSEC_KM } from './core/constants';
+import { DAY_S, DEG, J2000_JD, PARSEC_KM } from './core/constants';
 import { starLightColor } from './astro/stellar';
 import { fmtDuration, fmtLightYears } from './ui/format';
 import { _, applyDom, initI18n } from './i18n';
@@ -55,15 +56,32 @@ const REACH_FLICKER = import.meta.env.DEV && REACH_MODE
   && new URLSearchParams(window.location.search).get('reachFlicker') === '1';
 const REACH_PILOT = import.meta.env.DEV && REACH_MODE
   && new URLSearchParams(window.location.search).get('reachPilot') === 'proxima';
-const REACH_TRACE = REACH_PILOT && new URLSearchParams(window.location.search).get('reachTrace') === '1';
+const REACH_PROXIMA_PREVIEW = import.meta.env.DEV && REACH_MODE
+  && new URLSearchParams(window.location.search).get('reachPreview') === 'proxima';
+const REACH_PROXIMA_ENCOUNTER = REACH_PILOT || REACH_PROXIMA_PREVIEW;
+const REACH_TRACE = REACH_PROXIMA_ENCOUNTER && new URLSearchParams(window.location.search).get('reachTrace') === '1';
 const REACH_TRACE_FRESH = REACH_TRACE && new URLSearchParams(window.location.search).get('reachFresh') === '1';
-const REACH_NO_CORONA_BLEND = REACH_PILOT
+const REACH_NO_CORONA_BLEND = REACH_PROXIMA_ENCOUNTER
   && new URLSearchParams(window.location.search).get('reachNoCoronaBlend') === '1';
-const REACH_NO_PLANET_MESHES = REACH_PILOT
+const REACH_NO_PLANET_MESHES = REACH_PROXIMA_ENCOUNTER
   && new URLSearchParams(window.location.search).get('reachNoPlanetMeshes') === '1';
+const REACH_SHOW_PLANET_MESHES = REACH_PROXIMA_ENCOUNTER
+  && new URLSearchParams(window.location.search).get('reachShowPlanetMeshes') === '1';
+const REACH_HIDE_PROXIMA_PLANETS = REACH_PROXIMA_ENCOUNTER
+  && (!REACH_SHOW_PLANET_MESHES || REACH_NO_PLANET_MESHES);
 if (REACH_TRACE) (window as Window & { __reachArrivalTrace?: boolean }).__reachArrivalTrace = true;
-const REACH_ROUTE = REACH_PILOT ? REACH_PROXIMA_PILOT : REACH_PRODUCTION_ROUTE;
-const REACH_TIMING_MODE = new URLSearchParams(window.location.search).get('timing') === 'test' ? 'test' : 'production';
+const REACH_PREVIEW_ID = import.meta.env.DEV && REACH_MODE
+  ? new URLSearchParams(window.location.search).get('reachPreview') : null;
+const REACH_PREVIEW_ROUTE = REACH_PREVIEW_ID ? reachPreviewRoute(REACH_PREVIEW_ID) : null;
+if (REACH_PREVIEW_ID && !REACH_PREVIEW_ROUTE) throw new Error(`Unknown Reach preview stop: ${REACH_PREVIEW_ID}`);
+const REACH_SURFACE_PREVIEW = import.meta.env.DEV && REACH_MODE
+  && new URLSearchParams(window.location.search).get('reachSurface') === 'perseverance';
+if (REACH_SURFACE_PREVIEW && (new URLSearchParams(window.location.search).get('panorama') === '1'
+  || (window as Window & { __reachPanorama?: unknown }).__reachPanorama))
+  throw new Error('Perseverance surface preview requires a standalone development browser');
+const REACH_ROUTE = REACH_PREVIEW_ROUTE ?? (REACH_PILOT ? REACH_PROXIMA_PILOT : REACH_PRODUCTION_ROUTE);
+const REACH_TIMING_MODE = REACH_PREVIEW_ROUTE ? 'preview'
+  : new URLSearchParams(window.location.search).get('timing') === 'test' ? 'test' : 'production';
 
 class App implements UIHost {
   readonly universe: Universe;
@@ -85,16 +103,20 @@ class App implements UIHost {
   readonly input: Input;
   readonly camera: CameraController;
   readonly reach: ReachVoyageDirector | null;
+  private readonly surfacePreview: PerseveranceSurfacePreview | null;
   private readonly reachCountdown: ReachCountdownOverlay | null;
   private readonly reachOdometer: ReachOdometerOverlay | null;
   private readonly panorama = REACH_MODE ? readReachPanorama() : null;
   private readonly panoramaSync = this.panorama ? new ReachPanoramaSync(this.panorama) : null;
   private lastPanoramaSequence = -1;
-  private readonly reachStore: ReachJourneyStore | null = REACH_MODE && !REACH_FLICKER && this.panorama?.isPrimaryDisplay !== false
+  private readonly reachStore: ReachJourneyStore | null = REACH_MODE && !REACH_FLICKER
+    && !REACH_PREVIEW_ROUTE && !REACH_SURFACE_PREVIEW
+    && this.panorama?.isPrimaryDisplay !== false
     ? new LocalStorageReachJourneyStore(REACH_PILOT ? REACH_PROXIMA_PILOT_KEY : undefined) : null;
   private lastReachSave = performance.now();
+  private reachCheckpointWritable = true;
   private readonly arrivalTrace = REACH_TRACE
-    ? new ReachArrivalTrace(REACH_NO_CORONA_BLEND, REACH_NO_PLANET_MESHES) : null;
+    ? new ReachArrivalTrace(REACH_NO_CORONA_BLEND, REACH_HIDE_PROXIMA_PLANETS) : null;
   private planetPreparation: AbortController | null = null;
   readonly ui: UI;
   selected: CelestialBody | null = null;
@@ -151,8 +173,9 @@ class App implements UIHost {
     this.maxPointPx = Math.max(32, Math.min(256, (range?.[1] ?? 64) / this.engine.pixelRatio));
 
     this.universe = new Universe(catalog);
-    const savedJourney = diagnosticJourney ?? (this.reachStore && !REACH_TRACE_FRESH
-      ? loadReachJourney(this.reachStore, REACH_ROUTE, (id) => {
+    let savedJourney = REACH_PREVIEW_ROUTE || REACH_SURFACE_PREVIEW ? null : diagnosticJourney;
+    if (this.reachStore && !REACH_PREVIEW_ROUTE && !REACH_SURFACE_PREVIEW) {
+      const stored = inspectReachJourneyStore(this.reachStore, REACH_ROUTE, (id) => {
         const stop = REACH_ROUTE.stops.find((candidate) => candidate.id === id);
         if (stop) {
           const ref = destinationRef(stop);
@@ -160,8 +183,11 @@ class App implements UIHost {
           return !!(ref.kind === 'star' ? system.star : system.get(ref.bodyId));
         }
         return !!this.universe.get(id) || (REACH_PILOT && !!this.universe.system('c64548').get(id));
-      })
-      : null);
+      });
+      if (!savedJourney && !REACH_TRACE_FRESH) savedJourney = stored.state;
+      this.reachCheckpointWritable = stored.canWrite;
+      if (!stored.canWrite) console.warn('Reach checkpoint was not replaced because it could not be restored');
+    }
     if (savedJourney) {
       this.time.setRate(savedJourney.simulation.rate);
       this.time.jd = savedJourney.simulation.jd;
@@ -170,6 +196,18 @@ class App implements UIHost {
     }
     // Evaluate once so orbital elements exist before building renderers
     this.universe.update(this.time.jd, this.time.t);
+    if (REACH_SURFACE_PREVIEW) {
+      const mars = this.universe.get('mars');
+      const rover = this.universe.get('perseverance');
+      if (!mars || !rover) throw new Error('Perseverance surface preview catalogue is incomplete');
+      const daylightJd = marsPreviewDaylightJd(this.time.jd, mars.displayRotationHours, (jd) => {
+        this.universe.update(jd, (jd - J2000_JD) * DAY_S);
+        return new Vector3().subVectors(rover.position, mars.position).normalize()
+          .dot(new Vector3().subVectors(this.universe.star.position, mars.position).normalize());
+      });
+      this.time.jd = daylightJd;
+      this.universe.update(this.time.jd, this.time.t);
+    }
 
     this.galaxySprites = new GalaxySprites(this.universe.galaxies, scene, this.maxPointPx);
     this.landmarkSprites = new LandmarkSprites(this.universe.landmarks, scene);
@@ -217,12 +255,26 @@ class App implements UIHost {
 
     // Opening view: the planetary system as a slowly circling backdrop until the visitor picks a
     // destination (and again after a tour has finished)
-    if (REACH_MODE && this.panorama?.isPrimaryDisplay === false) {
+    if (REACH_SURFACE_PREVIEW) {
+      const mars = this.universe.get('mars');
+      const rover = this.universe.get('perseverance');
+      if (!mars || !rover) throw new Error('Perseverance surface preview catalogue is incomplete');
+      this.surfacePreview = new PerseveranceSurfacePreview(mars, rover, this.camera, scene);
+      this.reach = null;
+      this.reachCountdown = null;
+      this.reachOdometer = null;
+      this.uiVisible = false;
+      Object.defineProperty(window, '__reachSurfacePreviewStatus', {
+        value: () => this.surfacePreview!.status, configurable: false,
+      });
+    } else if (REACH_MODE && this.panorama?.isPrimaryDisplay === false) {
+      this.surfacePreview = null;
       this.reach = null;
       this.reachCountdown = null;
       this.reachOdometer = null;
       this.uiVisible = false;
     } else if (REACH_MODE) {
+      this.surfacePreview = null;
       this.reach = new ReachVoyageDirector(this.universe, this.camera, this.time,
         new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach(), REACH_ROUTE);
       const countdown = readCountdownContract(true);
@@ -239,6 +291,7 @@ class App implements UIHost {
       });
       this.checkpointReach();
     } else {
+      this.surfacePreview = null;
       this.reach = null;
       this.reachCountdown = null;
       this.reachOdometer = null;
@@ -280,7 +333,7 @@ class App implements UIHost {
   }
 
   private checkpointReach(): void {
-    if (!this.reach || !this.reachStore) return;
+    if (!this.reach || !this.reachStore || !this.reachCheckpointWritable) return;
     try { saveReachJourney(this.reachStore, this.reach.capture()); } catch { /* storage must not stop the voyage */ }
     this.lastReachSave = performance.now();
   }
@@ -334,7 +387,7 @@ class App implements UIHost {
     this.sunColor.set(r, g, b);
     this.starLuminosity = sys.catalogIndex === 0 ? 1 : this.universe.starInfo(sys.starId).luminosity;
     if (started) this.arrivalTrace!.event('load-system-renderables', performance.now() - started);
-    if (REACH_PILOT && !REACH_NO_PLANET_MESHES && sys.starId === 'c64548') {
+    if (REACH_PROXIMA_ENCOUNTER && !REACH_HIDE_PROXIMA_PLANETS && sys.starId === 'c64548') {
       const preparation = new AbortController();
       this.planetPreparation = preparation;
       this.arrivalTrace?.event('planet-preparation-start');
@@ -1213,6 +1266,8 @@ class App implements UIHost {
       if (this.camera.reference !== reference) this.camera.setReference(reference);
       this.camera.target = target;
       this.camera.mode = 'orbit';
+    } else if (this.surfacePreview) {
+      this.surfacePreview.update(dt, this.time.paused);
     } else if (this.reach?.directing) {
       this.reach.update(dt, this.time.paused);
     } else {
@@ -1278,28 +1333,48 @@ class App implements UIHost {
       fill: this.fillOut.size ? this.fillOut : null,
       ghost: g ? { id: g.body.id, alpha: g.alpha * g.alpha * (3 - 2 * g.alpha) } : null,
     });
+    this.surfacePreview?.render(this.bodies.byId.get('mars'), this.bodies.byId.get('perseverance'));
     const eligibleMeshes = this.arrivalTrace && this.universe.current.starId === 'c64548'
       ? this.bodies.views.filter((view) => view.meshVisible).map((view) => view.body.id).join(',') : '';
-    if (REACH_NO_PLANET_MESHES && this.universe.current.starId === 'c64548') {
+    const hideGeneratedBodies = REACH_HIDE_PROXIMA_PLANETS && this.universe.current.starId === 'c64548';
+    if (hideGeneratedBodies) {
       suppressProximaPlanetMeshes(this.bodies.views, star.id);
     }
     const bodiesMs = bodiesStarted ? performance.now() - bodiesStarted : 0;
     this.updateLensing(fovRad);
     this.points.setPixelRatio(eng.pixelRatio);
-    this.points.update(star.position, camPos, this.starLuminosity);
+    this.points.update(star.position, camPos, this.starLuminosity, hideGeneratedBodies);
     this.starPoints.setPixelRatio(eng.pixelRatio);
-    const pilotCruise = REACH_PILOT && this.universe.current.starId === 'c64548'
-      && this.reach?.countdown.phase === 'NEXT';
-    const starRadiusPx = this.bodies.byId.get(star.id)?.apparentRadiusPx ?? 0;
+    const nextStop = REACH_ROUTE.stops[this.reach?.countdown.routeIndex ?? 0];
+    const nextRef = nextStop ? destinationRef(nextStop) : null;
+    const starCruise = nextStop?.profile === 'star'
+      && this.reach?.countdown.phase === 'NEXT'
+      && nextRef?.kind === 'star'
+      && this.universe.current.starId === nextRef.starId;
+    const starView = this.bodies.byId.get(star.id);
+    const starRadiusPx = starView?.apparentRadiusPx ?? 0;
     const starAppearance = reachPilotStarAppearance(this.universe.current.catalogIndex,
-      starRadiusPx, !!pilotCruise, REACH_NO_CORONA_BLEND);
-    if (pilotCruise && !REACH_NO_CORONA_BLEND) {
-      const corona = this.bodies.byId.get(star.id)?.coronaMat;
-      if (corona) corona.uniforms.uIntensity.value *= starAppearance.coronaScale;
+      starRadiusPx, !!starCruise, REACH_NO_CORONA_BLEND);
+    const presentation = nextRef?.kind === 'star' && this.universe.current.starId === nextRef.starId
+      ? nextStop?.starPresentation : undefined;
+    // Wall-clock phase stays smooth when simulation time accelerates and agrees across panorama windows.
+    const [driftX, driftY, driftZ] = presentation ? reachStarVisualDrift(Date.now() / 1000) : [0, 0, 0];
+    if (star.data.appearance.kind === 'star' && starView?.surfaceMat) {
+      starView.surfaceMat.uniforms.uIntensity.value = 0.75 * starAppearance.discScale;
+      starView.surfaceMat.uniforms.uDrift.value.set(driftX, driftY, driftZ);
+      starView.surfaceMat.uniforms.uMotionStrength.value = presentation?.surfaceMotion ?? 0;
+      starView.surfaceMat.uniforms.uColorWarmth.value = presentation?.colorWarmth ?? 0;
     }
+    if (starView?.coronaMat) {
+      starView.coronaMat.uniforms.uDrift.value.set(driftX, driftY, driftZ);
+      starView.coronaMat.uniforms.uMotionStrength.value = presentation?.coronaMotion ?? 0;
+      starView.coronaMat.uniforms.uColorWarmth.value = presentation?.colorWarmth ?? 0;
+    }
+    if (starCruise && !REACH_NO_CORONA_BLEND && starView?.coronaMat)
+      starView.coronaMat.uniforms.uIntensity.value *= starAppearance.coronaScale;
     this.starPoints.update(this.camPc, starAppearance.hideIndex,
       starAppearance.targetIndex, starAppearance.pointOpacity,
-      pilotCruise ? this.bodies.byId.get(star.id)?.relPos ?? null : null);
+      starCruise ? starView?.relPos ?? null : null);
     this.procPoints.update(this.camPc, eng.pixelRatio, this.universe.current.starId, dt);
     for (const c of this.clouds.values()) c.update(this.camPc, pxPerRad, eng.pixelRatio, s.milkyWay);
     this.galaxySprites.update(this.camPc, pxPerRad, eng.pixelRatio, this.galaxyBoost, this.universe.currentGalaxy ?? -1);
@@ -1320,11 +1395,12 @@ class App implements UIHost {
       sp.update(this.camPc, pxPerRad, eng.pixelRatio, this.galaxyBoost, -1);
     });
     const orbitStarted = this.arrivalTrace ? performance.now() : 0;
-    this.orbits.update(camPos, ov.orbits ?? (s.orbits || this.backdrop || this.backdropPending),
+    this.orbits.update(camPos, !hideGeneratedBodies
+      && (ov.orbits ?? (s.orbits || this.backdrop || this.backdropPending)),
       ov.moonOrbits ?? s.moonOrbits, pxPerRad, (id) => this.bodies.byId.get(id)?.apparentRadiusPx ?? 0, this.selected?.id ?? null);
     const orbitMs = orbitStarted ? performance.now() - orbitStarted : 0;
     this.trajectories.update(camPos, this.time.jd, this.missions.lookup, s.orbits, eng.width * eng.pixelRatio, eng.height * eng.pixelRatio);
-    this.belts.update(this.time.t, sunRel, eng.pixelRatio, s.belts);
+    this.belts.update(this.time.t, sunRel, eng.pixelRatio, s.belts && !hideGeneratedBodies);
 
     // Render
     const renderStarted = this.arrivalTrace ? performance.now() : 0;
