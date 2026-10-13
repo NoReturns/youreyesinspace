@@ -97,7 +97,6 @@ const REACH_ROUTE = REACH_PREVIEW_ROUTE ?? (REACH_PILOT ? REACH_PROXIMA_PILOT : 
 const REACH_TIMING_MODE = REACH_PREVIEW_ROUTE ? 'preview'
   : import.meta.env.DEV && new URLSearchParams(window.location.search).get('timing') === 'test'
     ? 'test' : 'production';
-
 class App implements UIHost {
   readonly universe: Universe;
   readonly time = new TimeSystem();

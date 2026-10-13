@@ -283,13 +283,13 @@ assert.ok(Math.abs(geometricLegKm(origin, earth.position, moon.position)
   - earth.position.distanceTo(moon.position)) < 1e-6);
 assert.equal(geometricLegKm(new Vector3(100, -20, 30), new Vector3(0, 0, 0), new Vector3(3, 4, 12)), 13);
 assert.equal(formatVoyageDistance(42.681 * 149_597_870.7), '42.681 AU');
-assert.equal(formatVoyageDistance(9.4607e12), '1 LY');
-assert.equal(formatVoyageDistance(9.4607e18), '1 MLY');
-assert.match(formatVoyageDistance(9.4607e12 - 1), /AU$/);
-assert.match(formatVoyageDistance(9.4607e18 - 1), /LY$/);
-assert.equal(formatVoyageDistance(0.00001 * 149_597_870.7), '0.00001 AU');
-assert.notEqual(formatVoyageDistance(1), '0.000 AU');
-console.log('PASS geometric Solar System separation and automatic AU, LY, MLY display');
+assert.equal(formatVoyageDistance(9.4607e12), '1 ly');
+assert.equal(formatVoyageDistance(9.4607e18), '1 Mly');
+assert.match(formatVoyageDistance(9.4607e12 * 0.009), /AU$/);
+assert.match(formatVoyageDistance(9.4607e18 * 0.009), /ly$/);
+assert.match(formatVoyageDistance(0.00001 * 149_597_870.7), /km$/);
+assert.equal(formatVoyageDistance(1), '1 km');
+console.log('PASS geometric Solar System separation and adaptive km/AU/ly/Mly display');
 
 const measured = makeRun();
 const inFlight = until(measured, (s) => s.destinationId === 'moon'

@@ -273,7 +273,7 @@ const cruise = until(resumedDeparture, (s) => s.phase.kind === 'cruise' && s.pha
 assert.equal(cruise.frame.starId, 'c64548');
 assert.equal(cruise.camera.referenceId, 's64548-star');
 assert.ok(resumedDeparture.director.distanceTravelledKm > 0);
-assert.match(formatVoyageDistance(resumedDeparture.director.distanceTravelledKm), / (AU|LY)$/);
+assert.match(formatVoyageDistance(resumedDeparture.director.distanceTravelledKm), / (km|AU|ly|Mly|Gly)$/);
 assert.ok(parseReachJourney(JSON.stringify(cruise), pilot, hasDestination(resumedDeparture.universe)));
 const previousWindow = globalThis.window;
 const previousDocument = globalThis.document;
