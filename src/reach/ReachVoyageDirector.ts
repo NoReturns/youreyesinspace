@@ -8,7 +8,7 @@ import type { Universe } from '../core/Universe';
 import { SOLAR_SYSTEM } from '../data/solarSystem';
 import {
   REACH_ITINERARY_ID, REACH_ITINERARY_VERSION,
-  previousReachStopId, reachStopIdsForVersion, V4_STOP_IDS, type ReachDirection,
+  nextReachStopId, previousReachStopId, reachStopIdsForVersion, V5_STOP_IDS, type ReachDirection,
   type JourneyPhase, type Quat, type ReachFlightState, type ReachJourneyState, type Vec3,
 } from './JourneyState';
 import { ReachTiming } from './ReachTiming';
@@ -31,14 +31,14 @@ const nearbyStar = (id: string, starId: string, label: string): Stop => ({
 export const REACH_ITINERARY: readonly Stop[] = [
   { id: 'earth', profile: 'planet' },
   { id: 'iss', profile: 'probe' },
-  { id: 'hubble', profile: 'probe' },
   { id: 'moon', profile: 'moon' },
+  { id: 'hubble', profile: 'probe' },
   { id: 'jwst', profile: 'probe' },
+  { id: 'mars', profile: 'planet' },
   { id: 'sun', profile: 'sun' },
   { id: 'parker', profile: 'probe' },
   { id: 'mercury', profile: 'planet' },
   { id: 'venus', profile: 'planet' },
-  { id: 'mars', profile: 'planet' },
   { id: 'phobos', profile: 'moon' },
   { id: 'deimos', profile: 'moon' },
   { id: 'vesta', profile: 'small' },
@@ -89,7 +89,7 @@ export const REACH_ITINERARY: readonly Stop[] = [
   nearbyStar('star:c83130', 'c83130', 'Vega'),
 ];
 if (REACH_ITINERARY.length !== 57 || new Set(REACH_ITINERARY.map((stop) => stop.id)).size !== 57
-  || REACH_ITINERARY.some((stop, index) => stop.id !== V4_STOP_IDS[index]))
+  || REACH_ITINERARY.some((stop, index) => stop.id !== V5_STOP_IDS[index]))
   throw new Error('Reach v4 itinerary identity or order mismatch');
 
 export const REACH_PRODUCTION_ROUTE: ReachRoute = {
@@ -212,6 +212,7 @@ export class ReachVoyageDirector {
     private readonly route: ReachRoute = REACH_PRODUCTION_ROUTE,
   ) {
     this.stops = route.stops;
+    this.cycleItineraryVersion = route.version;
     for (const stop of this.stops) this.destination(stop);
     if (saved) { this.restore(saved); return; }
     const earth = this.body('earth');
@@ -281,7 +282,9 @@ export class ReachVoyageDirector {
     if (!saved.odometer && (saved.phase.kind === 'departure' || saved.phase.kind === 'cruise')) {
       const fromId = saved.phase.kind === 'departure' ? saved.destinationId
         : (this.transitionFromVersion
-          ? previousReachStopId(this.transitionFromVersion, saved.destinationId)
+          ? this.direction === 'inbound'
+            ? nextReachStopId(this.transitionFromVersion, saved.destinationId)
+            : previousReachStopId(this.transitionFromVersion, saved.destinationId)
           : this.stops[(this.stop + (this.direction === 'inbound' ? 1 : -1)
             + this.stops.length) % this.stops.length].id)!;
       const toId = saved.phase.kind === 'departure' ? saved.phase.nextId : saved.destinationId;
@@ -361,7 +364,6 @@ export class ReachVoyageDirector {
       if (this.route.id === REACH_ITINERARY_ID && this.route.version >= 4) {
         if (this.stop === this.stops.length - 1 && this.direction === 'outbound') {
           this.direction = 'inbound';
-          this.cycleItineraryVersion = this.route.version;
         } else if (this.stops[this.stop].id === 'earth' && this.direction === 'inbound') {
           if (!preRoundTripArrival) this.roundTripCount++;
           this.direction = 'outbound';
@@ -450,7 +452,7 @@ export class ReachVoyageDirector {
     if (!this.route.repeat || this.route.id !== REACH_ITINERARY_ID
       || this.route.version < 4)
       return this.stops[(this.stop + 1) % this.stops.length].id;
-    const ids = this.direction === 'inbound' && this.cycleItineraryVersion !== this.route.version
+    const ids = this.cycleItineraryVersion !== this.route.version
       ? reachStopIdsForVersion(this.cycleItineraryVersion) : this.stops.map((stop) => stop.id);
     if (!ids) throw new Error('Reach return itinerary is unavailable');
     const index = ids.indexOf(this.stops[this.stop].id);

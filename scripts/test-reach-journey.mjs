@@ -11,11 +11,11 @@ const entry = `
   export { StarSystem } from './src/core/StarSystem.ts';
   export { TimeSystem } from './src/core/TimeSystem.ts';
   export { SOLAR_SYSTEM } from './src/data/solarSystem.ts';
-  export { ReachTiming, REACH_TIMING, reachTravelKind } from './src/reach/ReachTiming.ts';
+  export { ReachTiming, REACH_TIMING, reachTravelKind, reachObserveKind } from './src/reach/ReachTiming.ts';
   export { COUNTDOWN_POSITIONS, ReachCountdownOverlay, formatCountdown, readCountdownContract, resolveCountdownPosition } from './src/reach/ReachCountdownOverlay.ts';
   export { ReachOdometerOverlay, formatVoyageDistance, geometricLegKm, readOdometerContract, resolveOdometerPosition } from './src/reach/ReachOdometer.ts';
   export { ReachPanoramaSync, applyPanoramaView, localPanoramaFovRad, parseReachPanorama, readReachPanorama } from './src/reach/ReachPanorama.ts';
-  export { inspectReachJourneyStore, loadReachJourney, parseReachJourney, saveReachJourney } from './src/reach/JourneyState.ts';
+  export { inspectReachJourneyStore, loadReachJourney, parseReachJourney, saveReachJourney, reachStopIdsForVersion } from './src/reach/JourneyState.ts';
 `;
 const bundle = await rolldown({
   input: '\0reach-journey-test',
@@ -33,16 +33,16 @@ new Function('require', 'module', 'exports', output.output[0].code)(
 );
 const {
   ReachVoyageDirector, REACH_ITINERARY, reachPreviewRoute, CameraController, StarSystem, TimeSystem, SOLAR_SYSTEM,
-  ReachTiming, REACH_TIMING, reachTravelKind, inspectReachJourneyStore,
+  ReachTiming, REACH_TIMING, reachTravelKind, reachObserveKind, reachStopIdsForVersion, inspectReachJourneyStore,
   loadReachJourney, parseReachJourney, saveReachJourney,
   COUNTDOWN_POSITIONS, ReachCountdownOverlay, formatCountdown, readCountdownContract, resolveCountdownPosition,
   ReachOdometerOverlay, formatVoyageDistance, geometricLegKm, readOdometerContract, resolveOdometerPosition,
   ReachPanoramaSync, applyPanoramaView, localPanoramaFovRad, parseReachPanorama, readReachPanorama,
 } = module.exports;
 
-// Keep the original Solar-only harness as a v3 migration fixture. The v4 production
+// Keep the original Solar-only harness as a v3 migration fixture. The expanded production
 // route uses real interstellar systems and has separate full-cycle coverage.
-const route = REACH_ITINERARY.slice(0, 47);
+const route = reachStopIdsForVersion(3).map((id) => REACH_ITINERARY.find((stop) => stop.id === id));
 const legacyProductionRoute = { id: 'solar-system-41', version: 3, stops: route, repeat: true };
 const input = { flush: () => ({ dx: 0, dy: 0, wheel: 0, pinch: 0, panX: 0, panY: 0 }), down: () => false };
 const date = '2026-10-10T00:00:00Z';
@@ -158,7 +158,7 @@ const valid = fresh.director.capture();
 const hasBody = (id) => !!fresh.universe.get(id);
 assert.equal(parseReachJourney('{bad json', route, hasBody), null);
 assert.equal(parseReachJourney(JSON.stringify({ ...valid, schema: 2 }), route, hasBody), null);
-assert.equal(parseReachJourney(JSON.stringify({ ...valid, itinerary: { ...valid.itinerary, version: 5 } }), route, hasBody), null);
+assert.equal(parseReachJourney(JSON.stringify({ ...valid, itinerary: { ...valid.itinerary, version: 6 } }), route, hasBody), null);
 assert.equal(parseReachJourney(JSON.stringify({ ...valid, destinationId: 'removed' }), route, hasBody), null);
 assert.equal(parseReachJourney(JSON.stringify(valid), route, (id) => id !== 'earth' && hasBody(id)), null);
 assert.equal(parseReachJourney(JSON.stringify({ ...valid, camera: { ...valid.camera, orientation: [0, 0, 0, 0] } }), route, hasBody), null);
@@ -218,7 +218,7 @@ for (const stop of route) {
     const travel = production.travel(stop);
     const observe = production.observe(stop);
     const [travelMin, travelMax] = REACH_TIMING.production.travel[reachTravelKind(stop)];
-    const [observeMin, observeMax] = REACH_TIMING.production.observe[stop.profile];
+    const [observeMin, observeMax] = REACH_TIMING.production.observe[reachObserveKind(stop)];
     assert.ok(Number.isFinite(travel) && travel > 0 && travel >= travelMin && travel <= travelMax);
     assert.ok(Number.isFinite(observe) && observe > 0 && observe >= observeMin && observe <= observeMax);
     const test = new ReachTiming('test', () => value);
@@ -511,7 +511,7 @@ assert.equal(resumedProduction.director.capture().phase.elapsed, savedProduction
 assert.ok(resumedProduction.camera.position.distanceTo(production.camera.position) < 1e-8);
 until(resumedProduction, (s) => s.destinationId === 'iss' && s.phase.kind === 'cruise');
 assert.equal(resumeDraws, 1);
-assert.equal(resumedProduction.director.capture().phase.duration, 900);
+assert.equal(resumedProduction.director.capture().phase.duration, 125);
 console.log('PASS production timing draws once per new phase and never rerolls on resume');
 
 const testFlight = makeRun();
@@ -576,14 +576,14 @@ v1Cruise.odometer.leg = { fromId: 'earth', toId: 'moon', distanceKm: 384_400,
   departureJd: v1Cruise.simulation.jd - 0.001 };
 const migratedCruise = parseReachJourney(JSON.stringify(v1Cruise), route, hasBody);
 assert.ok(migratedCruise, 'valid v1 cruise migrates');
-assert.equal(migratedCruise.itinerary.version, 4);
+assert.equal(migratedCruise.itinerary.version, 5);
 assert.equal(migratedCruise.routeIndex, route.findIndex((stop) => stop.id === 'moon'));
 assert.deepEqual(migratedCruise.odometer, v1Cruise.odometer, 'odometer history and active leg survive');
 const migratedRun = makeRun(migratedCruise);
 assert.equal(migratedRun.director.capture().phase.kind, 'cruise');
 const migratedCheckpoint = migratedRun.director.capture();
 assert.ok(parseReachJourney(JSON.stringify(migratedCheckpoint), route, hasBody),
-  'migrated active legacy leg survives a second restart as route v4');
+  'migrated active legacy leg survives a second restart on the current route');
 const noOdometer = structuredClone(v1Cruise);
 delete noOdometer.odometer;
 const restoredNoOdometer = makeRun(parseReachJourney(JSON.stringify(noOdometer), route, hasBody));
@@ -628,8 +628,8 @@ for (const oldRoute of historicalRoutes) {
     saved.odometer.completedKm += 987_654_321;
     saved.odometer.roundTrips = 4;
     const migrated = parseReachJourney(JSON.stringify(saved), route, hasBody);
-    assert.ok(migrated, `v${oldRoute.version} ${kind} migrates directly to v4`);
-    assert.equal(migrated.itinerary.version, 4);
+    assert.ok(migrated, `v${oldRoute.version} ${kind} migrates directly to the current route`);
+    assert.equal(migrated.itinerary.version, 5);
     assert.equal(migrated.routeIndex, approvedIds.indexOf(saved.destinationId));
     assert.deepEqual(migrated.phase, saved.phase);
     assert.deepEqual(migrated.simulation, saved.simulation);
@@ -651,7 +651,7 @@ for (const oldRoute of historicalRoutes) {
     assert.deepEqual(reloaded.odometer, migrated.odometer);
   }
 }
-console.log('PASS v1 and v2 observation, departure, flyby, and cruise migration to v4');
+console.log('PASS v1 and v2 observation, departure, flyby, and cruise migration');
 
 for (const oldRoute of historicalRoutes) {
   const fromId = oldRoute.version === 1 ? 'earth' : 'jwst';

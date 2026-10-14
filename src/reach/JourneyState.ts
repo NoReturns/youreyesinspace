@@ -4,7 +4,7 @@ import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, alphaShotSeconds } from '.
 
 export const REACH_JOURNEY_KEY = 'the-reach:journey:v1';
 export const REACH_ITINERARY_ID = 'solar-system-41';
-export const REACH_ITINERARY_VERSION = 4;
+export const REACH_ITINERARY_VERSION = 5;
 const EXPANDED_STOP_IDS = new Set(['iss', 'hubble', 'jwst', 'juno', 'newhorizons', 'parker']);
 /** Authored version 2 order, retained solely to validate and finish saved legs. */
 const V2_STOP_IDS = [
@@ -25,11 +25,16 @@ const V3_STOP_IDS = [
   'titania', 'oberon', 'neptune', 'triton', 'pluto', 'charon', 'haumea',
   'makemake', 'newhorizons', 'eris', 'pioneer11', 'pioneer10', 'voyager2', 'voyager1',
 ] as const;
-/** Archive this order when a later itinerary version is introduced. */
+/** Original v4 order, retained to validate and finish existing journeys. */
 export const V4_STOP_IDS = [
   ...V3_STOP_IDS, 'star:c64548', 'alpha-centauri-ab', 'star:c80155',
   'star:c108500', 'star:c49269', 'star:c29786', 'star:c109365',
   'star:c15247', 'star:c7458', 'star:c83130',
+] as const;
+/** Near-Earth reorder; all other stops keep their v4 relative order. */
+export const V5_STOP_IDS = [
+  'earth', 'iss', 'moon', 'hubble', 'jwst', 'mars',
+  ...V4_STOP_IDS.slice(5).filter((id) => id !== 'mars'),
 ] as const;
 export type ReachDirection = 'outbound' | 'inbound';
 export function reachStopIdsForVersion(version: number): readonly string[] | null {
@@ -37,6 +42,7 @@ export function reachStopIdsForVersion(version: number): readonly string[] | nul
   if (version === 2) return V2_STOP_IDS;
   if (version === 3) return V3_STOP_IDS;
   if (version === 4) return V4_STOP_IDS;
+  if (version === 5) return V5_STOP_IDS;
   return null;
 }
 export function previousReachStopId(version: number, destinationId: string): string | null {
@@ -44,6 +50,12 @@ export function previousReachStopId(version: number, destinationId: string): str
   if (!ids) return null;
   const index = ids.indexOf(destinationId);
   return index < 0 ? null : ids[(index - 1 + ids.length) % ids.length];
+}
+export function nextReachStopId(version: number, destinationId: string): string | null {
+  const ids = reachStopIdsForVersion(version);
+  if (!ids) return null;
+  const index = ids.indexOf(destinationId);
+  return index < 0 ? null : ids[(index + 1) % ids.length];
 }
 export const REACH_PROXIMA_PILOT_KEY = 'the-reach:journey:pilot-proxima:v4';
 
@@ -183,7 +195,7 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
   const direction: ReachDirection = migrating && (sourceVersion as number) < 4 ? 'outbound'
     : state.direction === 'outbound' || state.direction === 'inbound' ? state.direction : 'outbound';
   const cycleVersion = migrating && (sourceVersion as number) < 4 ? routeVersion
-    : migrating && direction === 'outbound' ? routeVersion : state.cycleItineraryVersion;
+    : state.cycleItineraryVersion;
   if (productionRoute && (!migrating || (sourceVersion as number) >= 4)
     && (state.direction !== 'outbound' && state.direction !== 'inbound'
       || !Number.isSafeInteger(cycleVersion) || (cycleVersion as number) < 4
@@ -223,7 +235,7 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
         ? transitionDirection === 'inbound'
           ? predecessor(transitionIds, state.destinationId) : successor(transitionIds, state.destinationId)
         : direction === 'inbound' ? predecessor(cycleIds, state.destinationId)
-          : successor(sourceIds, state.destinationId))
+          : successor(cycleIds, state.destinationId))
       || !nonzeroVec(phase.offset) || !quat(phase.orientation) || !unit(phase.up)
       || !finite(phase.orbitRate) || Math.abs(phase.orbitRate) > 1
       || !finite(phase.radialSpeed) || !finite(phase.endRadius) || phase.endRadius <= 0 || phase.endRadius >= 1e15
@@ -268,7 +280,7 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
           ? transitionDirection === 'inbound'
             ? successor(transitionIds, state.destinationId) : predecessor(transitionIds, state.destinationId)
           : direction === 'inbound' ? successor(cycleIds, state.destinationId)
-            : predecessor(sourceIds, state.destinationId))
+            : predecessor(cycleIds, state.destinationId))
         || odometer.leg.toId !== state.destinationId
         : odometer.leg !== null) return null;
   }

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 // Exercise production branches without writing a bundle or touching browser storage.
 const entry = `
   export { ReachVoyageDirector, REACH_ITINERARY, REACH_PRODUCTION_ROUTE } from './src/reach/ReachVoyageDirector.ts';
-  export { V4_STOP_IDS, reachStopIdsForVersion, parseReachJourney, inspectReachJourneyStore } from './src/reach/JourneyState.ts';
+  export { V4_STOP_IDS, V5_STOP_IDS, reachStopIdsForVersion, parseReachJourney, inspectReachJourneyStore } from './src/reach/JourneyState.ts';
   export { ReachPanoramaSync } from './src/reach/ReachPanorama.ts';
   export { destinationRef } from './src/reach/ReachDestinations.ts';
   export { createAlphaCentauriPreviewSystem, ALPHA_SYSTEM_ID, ALPHA_A_INDEX, ALPHA_B_INDEX }
@@ -16,7 +16,7 @@ const entry = `
   export { TimeSystem } from './src/core/TimeSystem.ts';
   export { Universe } from './src/core/Universe.ts';
   export { StarCatalog } from './src/data/StarCatalog.ts';
-  export { ReachTiming } from './src/reach/ReachTiming.ts';
+  export { ReachTiming, reachTravelKind, reachObserveKind } from './src/reach/ReachTiming.ts';
 `;
 const bundle = await rolldown({
   input: '\0reach-v4-test', transform: { define: { 'import.meta.env.DEV': 'false' } },
@@ -39,11 +39,11 @@ new Function('require', 'module', 'exports', output.output[0].code)(
   (id) => id === 'three' ? THREE : { _: (text) => text, fixed: String, localeTag: () => 'en' },
   module, module.exports,
 );
-const { ReachVoyageDirector, REACH_ITINERARY, REACH_PRODUCTION_ROUTE, V4_STOP_IDS,
+const { ReachVoyageDirector, REACH_ITINERARY, REACH_PRODUCTION_ROUTE, V4_STOP_IDS, V5_STOP_IDS,
   reachStopIdsForVersion, ReachPanoramaSync,
   parseReachJourney, inspectReachJourneyStore, destinationRef, createAlphaCentauriPreviewSystem,
   ALPHA_SYSTEM_ID, ALPHA_A_INDEX, ALPHA_B_INDEX, CameraController, TimeSystem, Universe,
-  StarCatalog, ReachTiming } = module.exports;
+  StarCatalog, ReachTiming, reachTravelKind, reachObserveKind } = module.exports;
 const bin = readFileSync('public/data/stars.bin');
 const names = JSON.parse(readFileSync('public/data/star-names.json', 'utf8'));
 const catalog = new StarCatalog(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength), names);
@@ -52,12 +52,41 @@ const input = { flush: () => ({ dx: 0, dy: 0, wheel: 0, pinch: 0, panX: 0, panY:
 const ids = REACH_ITINERARY.map((stop) => stop.id);
 assert.equal(ids.length, 57);
 assert.equal(new Set(ids).size, 57);
-assert.deepEqual(ids, V4_STOP_IDS);
+assert.deepEqual(ids, V5_STOP_IDS);
+assert.deepEqual(ids.slice(0, 6), ['earth', 'iss', 'moon', 'hubble', 'jwst', 'mars']);
+assert.deepEqual(ids.slice(-6), V4_STOP_IDS.slice(-6));
+assert.deepEqual([...ids].reverse().slice(-6), ['mars', 'jwst', 'hubble', 'moon', 'iss', 'earth']);
 assert.equal(ids[0], 'earth');
 assert.equal(ids[46], 'voyager1');
 assert.deepEqual(ids.slice(47), ['star:c64548', 'alpha-centauri-ab', 'star:c80155',
   'star:c108500', 'star:c49269', 'star:c29786', 'star:c109365',
   'star:c15247', 'star:c7458', 'star:c83130']);
+for (const id of ['iss', 'hubble', 'jwst']) {
+  const stop = REACH_ITINERARY.find((item) => item.id === id);
+  assert.equal(stop.profile, 'probe');
+  assert.equal(reachTravelKind(stop), 'nearEarthProbe');
+  assert.equal(reachObserveKind(stop), 'nearEarthProbe');
+  for (const [sample, travel, observe] of [[0, 75, 20], [0.5, 100, 30], [1, 125, 40]]) {
+    const timing = new ReachTiming('production', () => sample);
+    assert.equal(timing.travel(stop), travel);
+    assert.equal(timing.observe(stop), observe);
+    assert.equal(timing.departure(stop), 10);
+  }
+  assert.equal(new ReachTiming('test').travel(stop), 30);
+  assert.equal(new ReachTiming('test').observe(stop), 8);
+  assert.equal(new ReachTiming('preview').travel(stop), 8);
+  assert.equal(new ReachTiming('preview').observe(stop), 6);
+}
+for (const id of ['juno', 'newhorizons', 'parker', 'pioneer11', 'pioneer10', 'voyager1', 'voyager2']) {
+  const stop = REACH_ITINERARY.find((item) => item.id === id);
+  assert.equal(reachTravelKind(stop), 'probe');
+  assert.equal(reachObserveKind(stop), 'probe');
+  assert.equal(new ReachTiming('production', () => 0).travel(stop), 300);
+  assert.equal(new ReachTiming('production', () => 1).travel(stop), 900);
+  assert.equal(new ReachTiming('production', () => 0).observe(stop), 60);
+  assert.equal(new ReachTiming('production', () => 1).observe(stop), 180);
+}
+console.log('PASS near-Earth production timing only; other probes and test/preview unchanged');
 
 function hasDestination(universe, route = REACH_PRODUCTION_ROUTE) {
   return (id) => {
@@ -181,7 +210,7 @@ for (let i = 0; i < 40_000 && run.director.roundTrips === 0; i++) {
 }
 assert.equal(run.director.roundTrips, 1, 'Earth credits one full cycle');
 assert.equal(run.director.capture().direction, 'outbound');
-assert.equal(run.director.capture().cycleItineraryVersion, 4);
+assert.equal(run.director.capture().cycleItineraryVersion, 5);
 assert.equal(run.director.capture().odometer.leg, null);
 assert.deepEqual(arrivals, [...ids, ...ids.slice(0, -1).reverse()]);
 assert.equal(legs.length, 112);
@@ -277,7 +306,8 @@ assert.equal(until(makeRun(reloadedEarth), (state) => state.phase.kind === 'depa
   .phase.nextId, 'iss');
 console.log('PASS atomic Vega and Earth reversal survives reload');
 
-const legacyRoute = { ...REACH_PRODUCTION_ROUTE, version: 3, stops: REACH_ITINERARY.slice(0, 47) };
+const legacyRoute = { ...REACH_PRODUCTION_ROUTE, version: 3,
+  stops: reachStopIdsForVersion(3).map((id) => REACH_ITINERARY.find((stop) => stop.id === id)) };
 const legacy = makeRun(null, legacyRoute);
 const oldReturn = until(legacy, (state) => state.destinationId === 'voyager1'
   && state.phase.kind === 'departure');
@@ -333,21 +363,145 @@ for (const version of [1, 2]) {
 }
 console.log('PASS v1/v2 nonadjacent legs, persisted transition markers, and history against 57 stops');
 
+const oldV4Route = { ...REACH_PRODUCTION_ROUTE, version: 4,
+  stops: V4_STOP_IDS.map((id) => REACH_ITINERARY.find((stop) => stop.id === id)) };
+const oldObservedV4 = makeRun(null, oldV4Route);
+const oldHubbleObserve = until(oldObservedV4, (state) => state.destinationId === 'hubble'
+  && state.phase.kind === 'observe');
+const migratedObserve = parseReachJourney(JSON.stringify(oldHubbleObserve), REACH_PRODUCTION_ROUTE,
+  hasDestination(oldObservedV4.universe));
+assert.ok(migratedObserve);
+assert.equal(migratedObserve.cycleItineraryVersion, 4);
+assert.deepEqual(migratedObserve.phase, oldHubbleObserve.phase);
+assert.equal(until(makeRun(migratedObserve), (state) => state.phase.kind === 'departure')
+  .phase.nextId, 'moon');
+const oldProductionV4 = makeRun(null, oldV4Route, 'production');
+const oldIssFlight = until(oldProductionV4, (state) => state.destinationId === 'iss'
+  && state.phase.kind === 'cruise' && state.phase.elapsed >= 15);
+// Model a checkpoint written before this timing change at the same flight fraction.
+oldIssFlight.phase.elapsed *= 6;
+oldIssFlight.phase.duration = 600;
+oldIssFlight.camera.flight.elapsed = oldIssFlight.phase.elapsed;
+oldIssFlight.camera.flight.duration = 600;
+const migratedIssFlight = parseReachJourney(JSON.stringify(oldIssFlight), REACH_PRODUCTION_ROUTE,
+  hasDestination(oldProductionV4.universe));
+assert.ok(migratedIssFlight);
+assert.equal(migratedIssFlight.phase.duration, 600, 'old sampled duration survives new timing class');
+assert.equal(makeRun(migratedIssFlight, REACH_PRODUCTION_ROUTE, 'production').director.capture()
+  .phase.duration, 600);
+const oldV4 = makeRun(null, oldV4Route);
+const oldDeparture = until(oldV4, (state) => state.destinationId === 'hubble'
+  && state.phase.kind === 'departure' && state.phase.elapsed >= 3);
+assert.equal(oldDeparture.phase.nextId, 'moon');
+oldDeparture.odometer.completedKm = 123_456_789;
+oldDeparture.odometer.roundTrips = 2;
+const migratedDeparture = parseReachJourney(JSON.stringify(oldDeparture), REACH_PRODUCTION_ROUTE,
+  hasDestination(oldV4.universe));
+assert.ok(migratedDeparture);
+assert.equal(migratedDeparture.itinerary.version, 5);
+assert.equal(migratedDeparture.routeIndex, ids.indexOf('hubble'));
+assert.equal(migratedDeparture.cycleItineraryVersion, 4);
+assert.equal(migratedDeparture.transitionFromVersion, 4);
+assert.deepEqual(migratedDeparture.phase, oldDeparture.phase);
+assert.deepEqual(migratedDeparture.odometer, oldDeparture.odometer);
+assert.deepEqual(migratedDeparture.camera, oldDeparture.camera);
+const invalidOldIndex = { ...oldDeparture, routeIndex: V4_STOP_IDS.indexOf('moon') };
+assert.equal(parseReachJourney(JSON.stringify(invalidOldIndex), REACH_PRODUCTION_ROUTE,
+  hasDestination(oldV4.universe)), null, 'old route index must match its stable destination ID');
+const migratedV4 = makeRun(migratedDeparture);
+const oldMoonCruise = until(migratedV4, (state) => state.destinationId === 'moon'
+  && state.phase.kind === 'cruise' && state.phase.elapsed >= 15);
+assert.equal(oldMoonCruise.transitionFromVersion, 4);
+assert.equal(oldMoonCruise.phase.duration, oldMoonCruise.camera.flight.duration);
+const midFlight = parseReachJourney(JSON.stringify(oldMoonCruise), REACH_PRODUCTION_ROUTE,
+  hasDestination(migratedV4.universe));
+assert.ok(midFlight);
+assert.deepEqual(midFlight.odometer, oldMoonCruise.odometer);
+assert.deepEqual(midFlight.camera, oldMoonCruise.camera);
+const resumedMoon = makeRun(midFlight);
+assert.ok(resumedMoon.camera.position.distanceTo(migratedV4.camera.position) < 1e-8);
+assert.ok(resumedMoon.camera.quaternion.angleTo(migratedV4.camera.quaternion) < 1e-6);
+assert.equal(resumedMoon.director.capture().phase.duration, oldMoonCruise.phase.duration);
+assert.equal(resumedMoon.director.capture().camera.rollQuarterTurns,
+  oldMoonCruise.camera.rollQuarterTurns);
+assert.equal(resumedMoon.director.capture().camera.flight.rollDelta,
+  oldMoonCruise.camera.flight.rollDelta);
+const moonArrival = until(resumedMoon, (state) => state.destinationId === 'moon'
+  && state.phase.kind === 'flyby');
+assert.equal(moonArrival.odometer.completedKm,
+  oldMoonCruise.odometer.completedKm + oldMoonCruise.odometer.leg.distanceKm);
+assert.equal(moonArrival.odometer.roundTrips, 2);
+const continuedDeparture = until(resumedMoon, (state) => state.phase.kind === 'departure');
+assert.equal(continuedDeparture.phase.nextId, 'jwst');
+assert.ok(parseReachJourney(JSON.stringify(continuedDeparture), REACH_PRODUCTION_ROUTE,
+  hasDestination(resumedMoon.universe)), 'continued old outbound departure remains resumable');
+const continuedCruise = until(resumedMoon, (state) => state.phase.kind === 'cruise');
+assert.ok(parseReachJourney(JSON.stringify(continuedCruise), REACH_PRODUCTION_ROUTE,
+  hasDestination(resumedMoon.universe)), 'continued old outbound cruise remains resumable');
+console.log('PASS old v4 outbound leg keeps endpoint, duration, odometer, and roll across migration');
+
+const oldReturnV4 = makeRun(null, oldV4Route);
+const oldInbound = until(oldReturnV4, (state) => state.direction === 'inbound'
+  && state.destinationId === 'moon' && state.phase.kind === 'departure');
+assert.equal(oldInbound.phase.nextId, 'hubble');
+const migratedInbound = parseReachJourney(JSON.stringify(oldInbound), REACH_PRODUCTION_ROUTE,
+  hasDestination(oldReturnV4.universe));
+assert.ok(migratedInbound);
+assert.equal(migratedInbound.cycleItineraryVersion, 4);
+assert.equal(migratedInbound.transitionFromVersion, 4);
+const inboundV4 = makeRun(migratedInbound);
+const inboundFlight = until(inboundV4, (state) => state.destinationId === 'hubble'
+  && state.phase.kind === 'cruise' && state.phase.elapsed >= 10);
+assert.equal(inboundFlight.transitionFromVersion, 4);
+const reloadedInbound = parseReachJourney(JSON.stringify(inboundFlight), REACH_PRODUCTION_ROUTE,
+  hasDestination(inboundV4.universe));
+assert.ok(reloadedInbound);
+assert.deepEqual(reloadedInbound.odometer, inboundFlight.odometer);
+assert.deepEqual(reloadedInbound.camera, inboundFlight.camera);
+const inboundWithoutOdometer = structuredClone(inboundFlight);
+delete inboundWithoutOdometer.odometer;
+const parsedWithoutOdometer = parseReachJourney(JSON.stringify(inboundWithoutOdometer),
+  REACH_PRODUCTION_ROUTE, hasDestination(inboundV4.universe));
+assert.ok(parsedWithoutOdometer);
+assert.equal(makeRun(parsedWithoutOdometer).director.capture().odometer.leg.fromId, 'moon');
+const resumedInbound = makeRun(reloadedInbound);
+assert.ok(resumedInbound.camera.position.distanceTo(inboundV4.camera.position) < 1e-8);
+assert.ok(resumedInbound.camera.quaternion.angleTo(inboundV4.camera.quaternion) < 1e-6);
+const returnVisits = [];
+let returnPrevious = null;
+for (let i = 0; i < 10_000; i++) {
+  step(resumedInbound);
+  const state = resumedInbound.director.capture();
+  if (state.phase.kind === 'observe' && state.destinationId !== returnPrevious) {
+    returnVisits.push(state.destinationId);
+    returnPrevious = state.destinationId;
+  }
+  if (state.destinationId === 'earth' && state.phase.kind === 'observe'
+    && state.direction === 'outbound') break;
+}
+assert.deepEqual(returnVisits.slice(0, 3), ['hubble', 'iss', 'earth']);
+const returnedV4 = resumedInbound.director.capture();
+assert.equal(returnedV4.destinationId, 'earth');
+assert.equal(returnedV4.odometer.roundTrips, 1);
+assert.equal(returnedV4.cycleItineraryVersion, 5);
+assert.equal(until(resumedInbound, (state) => state.phase.kind === 'departure').phase.nextId, 'iss');
+console.log('PASS old v4 inbound order finishes, counts trip, then adopts new route');
+
 assert.ok(inboundSnapshot);
 const futureStop = { id: 'future:additional', profile: 'star', label: 'Future stop',
   ref: { kind: 'star', starId: 'c64548' } };
-const futureRoute = { ...REACH_PRODUCTION_ROUTE, version: 5,
+const futureRoute = { ...REACH_PRODUCTION_ROUTE, version: 6,
   stops: [...REACH_ITINERARY.slice(0, 49), futureStop, ...REACH_ITINERARY.slice(49)] };
 const futureSaved = parseReachJourney(JSON.stringify(inboundSnapshot), futureRoute,
   hasDestination(run.universe, futureRoute));
 assert.ok(futureSaved);
-assert.equal(futureSaved.cycleItineraryVersion, 4);
-assert.equal(futureSaved.transitionFromVersion, 4);
+assert.equal(futureSaved.cycleItineraryVersion, 5);
+assert.equal(futureSaved.transitionFromVersion, 5);
 const futureIntermediate = makeRun(futureSaved, futureRoute).director.capture();
 const futureReloaded = parseReachJourney(JSON.stringify(futureIntermediate), futureRoute,
   hasDestination(run.universe, futureRoute));
 assert.ok(futureReloaded);
-assert.equal(futureReloaded.transitionFromVersion, 4);
+assert.equal(futureReloaded.transitionFromVersion, 5);
 const futureVisits = [];
 const futureRun = makeRun(futureReloaded, futureRoute, 'test', (state) => {
   if (state.phase.kind === 'observe' || state.phase.kind === 'flyby'
@@ -358,9 +512,9 @@ until(futureRun, (state) => state.destinationId === 'earth'
   && state.phase.kind === 'observe' && state.odometer.roundTrips === 1);
 assert.equal(futureVisits[0], 'star:c80155', 'the active inbound leg keeps its saved target');
 assert.ok(!futureVisits.includes(futureStop.id), 'expanded stop is skipped on pinned inbound cycle');
-assert.equal(futureRun.director.capture().cycleItineraryVersion, 5);
+assert.equal(futureRun.director.capture().cycleItineraryVersion, 6);
 assert.equal(until(futureRun, (state) => state.phase.kind === 'departure').phase.nextId, 'iss');
-console.log('PASS inbound cycle remains on v4 after a simulated v5 expansion');
+console.log('PASS inbound cycle remains on v5 after a simulated v6 expansion');
 
 const previousChannel = globalThis.BroadcastChannel;
 const previousWindow = globalThis.window;
