@@ -72,6 +72,8 @@ export interface ReachFlightState {
   gentleStart: boolean;
   /** Absent in checkpoints written before cinematic cruise viewing was introduced. */
   cinematicCruise?: boolean;
+  /** Signed local-view roll added over this cruise; absent in older checkpoints. */
+  rollDelta?: number;
 }
 
 export interface ReachJourneyState {
@@ -96,6 +98,8 @@ export interface ReachJourneyState {
     targetId: string;
     autoOrbit: number;
     flight: ReachFlightState | null;
+    /** Arrival orientation in quarter turns; absent in older checkpoints. */
+    rollQuarterTurns?: number;
   };
 }
 
@@ -157,6 +161,10 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
     || typeof state.camera.referenceId !== 'string' || !hasBody(state.camera.referenceId)
     || typeof state.camera.targetId !== 'string' || !hasBody(state.camera.targetId)
     || !finite(state.camera.autoOrbit) || Math.abs(state.camera.autoOrbit) > 1
+    || (state.camera.rollQuarterTurns !== undefined
+      && (!Number.isInteger(state.camera.rollQuarterTurns)
+        || (state.camera.rollQuarterTurns as number) < 0
+        || (state.camera.rollQuarterTurns as number) > 3))
     || !record(state.phase) || !duration(state.phase.duration)
     || !progress(state.phase.elapsed, state.phase.duration)) return null;
 
@@ -229,7 +237,10 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
       || !finite(flight.endDistance) || flight.endDistance <= 0 || flight.endDistance >= 1e15
       || !quat(flight.startOrientation) || (flight.up !== null && !unit(flight.up))
       || typeof flight.gentleStart !== 'boolean'
-      || (flight.cinematicCruise !== undefined && typeof flight.cinematicCruise !== 'boolean')) return null;
+      || (flight.cinematicCruise !== undefined && typeof flight.cinematicCruise !== 'boolean')
+      || (flight.rollDelta !== undefined && (!finite(flight.rollDelta)
+        || ![-Math.PI, -Math.PI / 2, 0, Math.PI / 2, Math.PI].some(
+          (angle) => Math.abs(angle - (flight.rollDelta as number)) < 1e-9)))) return null;
   } else if (phase.kind === 'binary') {
     if (state.destinationId !== 'alpha-centauri-ab'
       || !binaryTargets.includes(state.camera.targetId as string)

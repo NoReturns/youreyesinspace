@@ -34,6 +34,8 @@ interface Autopilot {
   gentleStart?: boolean;
   /** Reach long cruise: a small, deterministic viewing drift around the flight aim. */
   cinematicCruise?: boolean;
+  /** Reach-only local-view roll from this flight's starting orientation, in radians. */
+  rollDelta?: number;
 }
 
 const _v = new Vector3();
@@ -368,6 +370,10 @@ export class CameraController {
           const pitch = envelope * 0.04 * Math.sin(elapsed * Math.PI * 2 / 330 + 0.8);
           this.quaternion.multiply(_q2.setFromAxisAngle(Y, yaw));
           this.quaternion.multiply(_q2.setFromAxisAngle(X, pitch));
+        }
+        if (ap.rollDelta) {
+          this.quaternion.multiply(_q2.setFromAxisAngle(Z,
+            ap.rollDelta * smoothstep((raw - 0.25) / 0.5)));
         }
       } else {
         _m.lookAt(new Vector3(), _v.copy(tgtPos).sub(this.position), _v2.set(0, 1, 0).applyQuaternion(ap.q0));

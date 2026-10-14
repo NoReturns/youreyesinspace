@@ -131,6 +131,18 @@ function smoothstep(t: number): number {
 const vec = (v: Vector3): Vec3 => [v.x, v.y, v.z];
 const quat = (q: Quaternion): Quat => [q.x, q.y, q.z, q.w];
 
+/** A stable, evenly distributed choice for each directed leg and completed journey. */
+export function reachArrivalRollQuarterTurns(fromId: string, toId: string,
+  direction: ReachDirection, roundTrips: number): number {
+  const key = `${roundTrips}|${direction}|${fromId}|${toId}`;
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) hash = Math.imul(hash ^ key.charCodeAt(i), 16777619);
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x7feb352d);
+  hash ^= hash >>> 15;
+  return hash & 3;
+}
+
 /** A passive voyage, independent of missions and tours. */
 export class ReachVoyageDirector {
   private readonly arrivalSystem = new StarSystem('reach-arrival', 'c0', 0, new Vector3(), SOLAR_SYSTEM, [], []);
@@ -140,6 +152,7 @@ export class ReachVoyageDirector {
   private observeDuration = 0;
   private completedKm = 0;
   private roundTripCount = 0;
+  private rollQuarterTurns = 0;
   private direction: ReachDirection = 'outbound';
   private cycleItineraryVersion = REACH_ITINERARY_VERSION;
   private transitionFromVersion: number | null = null;
@@ -238,6 +251,7 @@ export class ReachVoyageDirector {
         startOffset: vec(ap.r0), endDirection: vec(ap.dir1), endDistance: ap.dist1,
         startOrientation: quat(ap.q0), up: ap.up1 ? vec(ap.up1) : null,
         gentleStart: ap.gentleStart ?? false, cinematicCruise: ap.cinematicCruise ?? false };
+      if (ap.rollDelta !== undefined) flight.rollDelta = ap.rollDelta;
     }
     return {
       schema: 1, itinerary: { id: this.route.id, version: this.route.version },
@@ -250,7 +264,8 @@ export class ReachVoyageDirector {
       odometer: { completedKm: this.completedKm, roundTrips: this.roundTripCount,
         leg: this.leg ? { ...this.leg } : null },
       camera: { position: vec(c.position), orientation: quat(c.quaternion),
-        referenceId: c.reference.id, targetId: c.target.id, autoOrbit: c.autoOrbit, flight },
+        referenceId: c.reference.id, targetId: c.target.id, autoOrbit: c.autoOrbit, flight,
+        rollQuarterTurns: this.rollQuarterTurns },
     };
   }
 
@@ -258,6 +273,7 @@ export class ReachVoyageDirector {
     this.stop = this.stops.findIndex((stop) => stop.id === saved.destinationId);
     this.completedKm = saved.odometer?.completedKm ?? 0;
     this.roundTripCount = saved.odometer?.roundTrips ?? 0;
+    this.rollQuarterTurns = saved.camera.rollQuarterTurns ?? 0;
     this.direction = saved.direction;
     this.cycleItineraryVersion = saved.cycleItineraryVersion;
     this.transitionFromVersion = saved.transitionFromVersion ?? null;
@@ -289,6 +305,7 @@ export class ReachVoyageDirector {
       up1: flight.up ? new Vector3().fromArray(flight.up) : undefined,
       gentleStart: flight.gentleStart,
       cinematicCruise: flight.cinematicCruise ?? false,
+      rollDelta: flight.rollDelta,
     } : null;
 
     const phase = saved.phase;
@@ -355,6 +372,9 @@ export class ReachVoyageDirector {
       const stop = this.stops[this.stop];
       if (stop.binaryOverview && (stop.id === REACH_ALPHA_DESTINATION_ID
         || this.route.id === 'preview:alpha-centauri' && stop.id === 'alpha:establish')) {
+        // Alpha's authored up vector becomes the new zero reference; its camera
+        // orientation is left untouched and its shots remain wholly authored.
+        this.rollQuarterTurns = 0;
         const barycenter = this.body(ALPHA_BARY_ID);
         const a = this.body(`s${ALPHA_A_INDEX}-star`);
         const b = this.body(`s${ALPHA_B_INDEX}-star`);
@@ -500,6 +520,16 @@ export class ReachVoyageDirector {
       ? new Vector3().crossVectors(companion.position.clone().sub(primary.position), binaryDirection).normalize()
       : undefined;
     this.camera.goToVantage(destination, arrival, distance, flightDuration, binaryUp, stop.profile !== 'star', true);
+    // The stored angle is the arrival orientation. The flight owns the transition from
+    // its captured start quaternion, so a restart can reconstruct any point in it.
+    if (!stop.binaryOverview) {
+      const targetRoll = reachArrivalRollQuarterTurns(this.leg!.fromId,
+        stop.id, this.direction, this.roundTripCount);
+      let steps = (targetRoll - this.rollQuarterTurns + 4) % 4;
+      if (steps > 2) steps -= 4;
+      this.camera.autopilot!.rollDelta = steps * Math.PI / 2;
+      this.rollQuarterTurns = targetRoll;
+    }
     this.stage = 'cruise';
     this.onPhaseChange?.();
   }
