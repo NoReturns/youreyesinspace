@@ -576,7 +576,7 @@ v1Cruise.odometer.leg = { fromId: 'earth', toId: 'moon', distanceKm: 384_400,
   departureJd: v1Cruise.simulation.jd - 0.001 };
 const migratedCruise = parseReachJourney(JSON.stringify(v1Cruise), route, hasBody);
 assert.ok(migratedCruise, 'valid v1 cruise migrates');
-assert.equal(migratedCruise.itinerary.version, 5);
+assert.equal(migratedCruise.itinerary.version, 6);
 assert.equal(migratedCruise.routeIndex, route.findIndex((stop) => stop.id === 'moon'));
 assert.deepEqual(migratedCruise.odometer, v1Cruise.odometer, 'odometer history and active leg survive');
 const migratedRun = makeRun(migratedCruise);
@@ -629,7 +629,7 @@ for (const oldRoute of historicalRoutes) {
     saved.odometer.roundTrips = 4;
     const migrated = parseReachJourney(JSON.stringify(saved), route, hasBody);
     assert.ok(migrated, `v${oldRoute.version} ${kind} migrates directly to the current route`);
-    assert.equal(migrated.itinerary.version, 5);
+    assert.equal(migrated.itinerary.version, 6);
     assert.equal(migrated.routeIndex, approvedIds.indexOf(saved.destinationId));
     assert.deepEqual(migrated.phase, saved.phase);
     assert.deepEqual(migrated.simulation, saved.simulation);

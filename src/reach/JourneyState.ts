@@ -1,10 +1,11 @@
 import type { ReachOdometerState } from './ReachOdometer';
+import { LANDMARKS } from '../data/landmarks';
 import { destinationRef, destinationSystem, type ReachRoute, type ReachStop } from './ReachDestinations';
 import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, alphaShotSeconds } from './ReachAlphaCentauri';
 
 export const REACH_JOURNEY_KEY = 'the-reach:journey:v1';
 export const REACH_ITINERARY_ID = 'solar-system-41';
-export const REACH_ITINERARY_VERSION = 5;
+export const REACH_ITINERARY_VERSION = 6;
 const EXPANDED_STOP_IDS = new Set(['iss', 'hubble', 'jwst', 'juno', 'newhorizons', 'parker']);
 /** Authored version 2 order, retained solely to validate and finish saved legs. */
 const V2_STOP_IDS = [
@@ -36,6 +37,11 @@ export const V5_STOP_IDS = [
   'earth', 'iss', 'moon', 'hubble', 'jwst', 'mars',
   ...V4_STOP_IDS.slice(5).filter((id) => id !== 'mars'),
 ] as const;
+/** Stellar extension; retain v5 for saved outbound and inbound cycles. */
+export const V6_STOP_IDS = [
+  ...V5_STOP_IDS, 'star:c10818', 'star:c25822', 'star:c73646', 'star:c92866',
+  'star:l3', 'star:l15', 'star:l17',
+] as const;
 export type ReachDirection = 'outbound' | 'inbound';
 export function reachStopIdsForVersion(version: number): readonly string[] | null {
   if (version === 1) return V1_STOP_IDS;
@@ -43,6 +49,7 @@ export function reachStopIdsForVersion(version: number): readonly string[] | nul
   if (version === 3) return V3_STOP_IDS;
   if (version === 4) return V4_STOP_IDS;
   if (version === 5) return V5_STOP_IDS;
+  if (version === 6) return V6_STOP_IDS;
   return null;
 }
 export function previousReachStopId(version: number, destinationId: string): string | null {
@@ -133,6 +140,8 @@ const record = (v: unknown): v is Record<string, unknown> => v !== null && typeo
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const vec3 = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3
   && v.every((n) => finite(n) && Math.abs(n) < 1e15);
+const interstellarVec3 = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3
+  && v.every((n) => finite(n) && Math.abs(n) < 1e21);
 const nonzeroVec = (v: unknown): v is Vec3 => vec3(v) && v.some((n) => n !== 0);
 const quat = (v: unknown): v is Quat => Array.isArray(v) && v.length === 4 && v.every(finite)
   && Math.abs(v.reduce((sum: number, n: number) => sum + n * n, 0) - 1) < 1e-3;
@@ -169,7 +178,7 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
     || state.simulation.jd < 2_000_000 || state.simulation.jd > 3_000_000
     || !finite(state.simulation.rate) || state.simulation.rate <= 0 || state.simulation.rate > 1_000_000
     || !record(state.frame) || typeof state.frame.starId !== 'string'
-    || !record(state.camera) || !vec3(state.camera.position) || !quat(state.camera.orientation)
+    || !record(state.camera) || !interstellarVec3(state.camera.position) || !quat(state.camera.orientation)
     || typeof state.camera.referenceId !== 'string' || !hasBody(state.camera.referenceId)
     || typeof state.camera.targetId !== 'string' || !hasBody(state.camera.targetId)
     || !finite(state.camera.autoOrbit) || Math.abs(state.camera.autoOrbit) > 1
@@ -216,7 +225,11 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
     return index < 0 ? null : ids[(index + 1) % ids.length];
   };
   const currentRef = destinationRef(destination);
-  const expectedBodyId = currentRef.kind === 'star' ? `s${currentRef.starId.slice(1)}-star` : currentRef.bodyId;
+  const expectedBodyId = currentRef.kind === 'star'
+    ? currentRef.starId.startsWith('l')
+      ? LANDMARKS[Number(currentRef.starId.slice(1))]?.id
+      : `s${currentRef.starId.slice(1)}-star`
+    : currentRef.bodyId;
   const expectedFrame = destinationSystem(destination);
   if (state.frame.starId !== expectedFrame || state.camera.referenceId !== expectedBodyId) return null;
   const binaryTargets = [ALPHA_BARY_ID, `s${ALPHA_A_INDEX}-star`, `s${ALPHA_B_INDEX}-star`];
@@ -245,7 +258,8 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
     if (!record(flight) || flight.targetId !== expectedBodyId
       || !duration(flight.duration) || !progress(flight.elapsed, flight.duration)
       || flight.duration !== phase.duration || flight.elapsed !== phase.elapsed
-      || !nonzeroVec(flight.startOffset) || !unit(flight.endDirection)
+      || !interstellarVec3(flight.startOffset) || flight.startOffset.every((n) => n === 0)
+      || !unit(flight.endDirection)
       || !finite(flight.endDistance) || flight.endDistance <= 0 || flight.endDistance >= 1e15
       || !quat(flight.startOrientation) || (flight.up !== null && !unit(flight.up))
       || typeof flight.gentleStart !== 'boolean'

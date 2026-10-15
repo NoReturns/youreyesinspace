@@ -69,7 +69,9 @@ assert.equal(wohRoute?.stops[1].ref.starId, `l${LANDMARKS.indexOf(woh)}`);
 assert.equal(betelRoute?.repeat, false);
 assert.equal(wohRoute?.repeat, false);
 assert.equal(REACH_PRODUCTION_ROUTE.stops.some((stop) =>
-  stop.id === betelRoute.stops[1].id || stop.id === wohRoute.stops[1].id), false);
+  stop.id === betelRoute.stops[1].id), true);
+assert.equal(REACH_PRODUCTION_ROUTE.stops.some((stop) =>
+  stop.id === wohRoute.stops[1].id), true);
 assert.equal(reachPreviewRoute('proxima')?.id, 'preview:proxima');
 assert.equal(scalePreviewEnabled(true, true, 'betelgeuse', '1', true), true);
 assert.equal(scalePreviewEnabled(true, true, 'woh-g64', '1', true), true);

@@ -205,12 +205,10 @@ class App implements UIHost {
         if (id === ALPHA_BARY_ID || id === `s${ALPHA_A_INDEX}-star`
           || id === `s${ALPHA_B_INDEX}-star`)
           return !!this.universe.system(ALPHA_SYSTEM_ID).get(id);
-        const catalogueStar = /^s(\d+)-star$/.exec(id);
-        return !!(catalogueStar && REACH_ROUTE.stops.some((candidate) => {
+        return REACH_ROUTE.stops.some((candidate) => {
           const ref = destinationRef(candidate);
-          return ref.kind === 'star' && ref.starId === `c${catalogueStar[1]}`
-            && !!this.universe.system(ref.starId).get(id);
-        }));
+          return ref.kind === 'star' && this.universe.system(ref.starId).star?.id === id;
+        });
       });
       if (!savedJourney && !REACH_TRACE_FRESH) savedJourney = stored.state;
       this.reachCheckpointWritable = stored.canWrite;

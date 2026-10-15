@@ -9,7 +9,7 @@ import { SOLAR_SYSTEM } from '../data/solarSystem';
 import { LANDMARKS } from '../data/landmarks';
 import {
   REACH_ITINERARY_ID, REACH_ITINERARY_VERSION,
-  nextReachStopId, previousReachStopId, reachStopIdsForVersion, V5_STOP_IDS, type ReachDirection,
+  nextReachStopId, previousReachStopId, reachStopIdsForVersion, V6_STOP_IDS, type ReachDirection,
   type JourneyPhase, type Quat, type ReachFlightState, type ReachJourneyState, type Vec3,
 } from './JourneyState';
 import { ReachTiming } from './ReachTiming';
@@ -27,6 +27,11 @@ const nearbyStar = (id: string, starId: string, label: string): Stop => ({
   starPresentation: { observationDistanceRadii: REACH_NEARBY_OBSERVATION_RADII,
     surfaceMotion: 0.6, coronaMotion: 0.2, colorWarmth: 0 },
 });
+const landmarkStar = (landmarkId: string, label: string): Stop => {
+  const index = LANDMARKS.findIndex((entry) => entry.id === landmarkId && entry.kind === 'star' && entry.star);
+  if (index < 0) throw new Error(`Missing stellar landmark ${landmarkId}`);
+  return nearbyStar(`star:l${index}`, `l${index}`, label);
+};
 
 // Route order and presentation profile only. Durations come from ReachTiming.
 export const REACH_ITINERARY: readonly Stop[] = [
@@ -88,10 +93,18 @@ export const REACH_ITINERARY: readonly Stop[] = [
   nearbyStar('star:c15247', 'c15247', 'Epsilon Eridani'),
   nearbyStar('star:c7458', 'c7458', 'Tau Ceti'),
   nearbyStar('star:c83130', 'c83130', 'Vega'),
+  nearbyStar('star:c10818', 'c10818', 'Polaris'),
+  nearbyStar('star:c25822', 'c25822', 'Betelgeuse'),
+  nearbyStar('star:c73646', 'c73646', 'Antares'),
+  nearbyStar('star:c92866', 'c92866', 'Deneb'),
+  landmarkStar('l-etacar', 'Eta Carinae'),
+  landmarkStar('l-r136a1', 'R136a1'),
+  landmarkStar('l-wohg64', 'WOH G64'),
 ];
-if (REACH_ITINERARY.length !== 57 || new Set(REACH_ITINERARY.map((stop) => stop.id)).size !== 57
-  || REACH_ITINERARY.some((stop, index) => stop.id !== V5_STOP_IDS[index]))
-  throw new Error('Reach v4 itinerary identity or order mismatch');
+if (REACH_ITINERARY.length !== V6_STOP_IDS.length
+  || new Set(REACH_ITINERARY.map((stop) => stop.id)).size !== V6_STOP_IDS.length
+  || REACH_ITINERARY.some((stop, index) => stop.id !== V6_STOP_IDS[index]))
+  throw new Error('Reach v6 itinerary identity or order mismatch');
 
 export const REACH_PRODUCTION_ROUTE: ReachRoute = {
   id: REACH_ITINERARY_ID, version: REACH_ITINERARY_VERSION, stops: REACH_ITINERARY, repeat: true,
@@ -471,6 +484,11 @@ export class ReachVoyageDirector {
     if (!ids) throw new Error('Reach return itinerary is unavailable');
     const index = ids.indexOf(this.stops[this.stop].id);
     if (index < 0) throw new Error('Reach current stop is absent from its cycle');
+    if (this.direction === 'outbound' && index === ids.length - 1
+      && this.cycleItineraryVersion < this.route.version && this.stop < this.stops.length - 1) {
+      this.cycleItineraryVersion = this.route.version;
+      return this.stops[this.stop + 1].id;
+    }
     return ids[index + (this.direction === 'inbound' ? -1 : 1)]!;
   }
 

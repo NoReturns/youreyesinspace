@@ -7,7 +7,7 @@ import * as THREE from 'three';
 // Exercise production branches without writing a bundle or touching browser storage.
 const entry = `
   export { ReachVoyageDirector, REACH_ITINERARY, REACH_PRODUCTION_ROUTE } from './src/reach/ReachVoyageDirector.ts';
-  export { V4_STOP_IDS, V5_STOP_IDS, reachStopIdsForVersion, parseReachJourney, inspectReachJourneyStore } from './src/reach/JourneyState.ts';
+  export { V4_STOP_IDS, V5_STOP_IDS, V6_STOP_IDS, reachStopIdsForVersion, parseReachJourney, inspectReachJourneyStore } from './src/reach/JourneyState.ts';
   export { ReachPanoramaSync } from './src/reach/ReachPanorama.ts';
   export { destinationRef } from './src/reach/ReachDestinations.ts';
   export { createAlphaCentauriPreviewSystem, ALPHA_SYSTEM_ID, ALPHA_A_INDEX, ALPHA_B_INDEX }
@@ -16,6 +16,7 @@ const entry = `
   export { TimeSystem } from './src/core/TimeSystem.ts';
   export { Universe } from './src/core/Universe.ts';
   export { StarCatalog } from './src/data/StarCatalog.ts';
+  export { LANDMARKS } from './src/data/landmarks.ts';
   export { ReachTiming, reachTravelKind, reachObserveKind } from './src/reach/ReachTiming.ts';
 `;
 const bundle = await rolldown({
@@ -39,28 +40,46 @@ new Function('require', 'module', 'exports', output.output[0].code)(
   (id) => id === 'three' ? THREE : { _: (text) => text, fixed: String, localeTag: () => 'en' },
   module, module.exports,
 );
-const { ReachVoyageDirector, REACH_ITINERARY, REACH_PRODUCTION_ROUTE, V4_STOP_IDS, V5_STOP_IDS,
+const { ReachVoyageDirector, REACH_ITINERARY, REACH_PRODUCTION_ROUTE, V4_STOP_IDS, V5_STOP_IDS, V6_STOP_IDS,
   reachStopIdsForVersion, ReachPanoramaSync,
   parseReachJourney, inspectReachJourneyStore, destinationRef, createAlphaCentauriPreviewSystem,
   ALPHA_SYSTEM_ID, ALPHA_A_INDEX, ALPHA_B_INDEX, CameraController, TimeSystem, Universe,
-  StarCatalog, ReachTiming, reachTravelKind, reachObserveKind } = module.exports;
+  StarCatalog, LANDMARKS, ReachTiming, reachTravelKind, reachObserveKind } = module.exports;
 const bin = readFileSync('public/data/stars.bin');
 const names = JSON.parse(readFileSync('public/data/star-names.json', 'utf8'));
 const catalog = new StarCatalog(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength), names);
 const input = { flush: () => ({ dx: 0, dy: 0, wheel: 0, pinch: 0, panX: 0, panY: 0 }),
   down: () => false };
 const ids = REACH_ITINERARY.map((stop) => stop.id);
-assert.equal(ids.length, 57);
-assert.equal(new Set(ids).size, 57);
-assert.deepEqual(ids, V5_STOP_IDS);
+assert.equal(ids.length, 64);
+assert.equal(new Set(ids).size, 64);
+assert.deepEqual(ids, V6_STOP_IDS);
 assert.deepEqual(ids.slice(0, 6), ['earth', 'iss', 'moon', 'hubble', 'jwst', 'mars']);
-assert.deepEqual(ids.slice(-6), V4_STOP_IDS.slice(-6));
+assert.deepEqual(ids.slice(0, 57), V5_STOP_IDS);
 assert.deepEqual([...ids].reverse().slice(-6), ['mars', 'jwst', 'hubble', 'moon', 'iss', 'earth']);
 assert.equal(ids[0], 'earth');
 assert.equal(ids[46], 'voyager1');
 assert.deepEqual(ids.slice(47), ['star:c64548', 'alpha-centauri-ab', 'star:c80155',
   'star:c108500', 'star:c49269', 'star:c29786', 'star:c109365',
-  'star:c15247', 'star:c7458', 'star:c83130']);
+  'star:c15247', 'star:c7458', 'star:c83130', 'star:c10818', 'star:c25822',
+  'star:c73646', 'star:c92866', 'star:l3', 'star:l15', 'star:l17']);
+for (const [index, label] of [[10818, 'Polaris'], [25822, 'Betelgeuse'],
+  [73646, 'Antares'], [92866, 'Deneb']]) {
+  const info = catalog.info(index);
+  assert.equal(info.name, label);
+  assert.ok(Number.isFinite(info.distancePc) && info.distancePc > 0);
+  assert.ok(Number.isFinite(info.radiusKm) && info.radiusKm > 0);
+}
+for (const [index, id] of [[3, 'l-etacar'], [15, 'l-r136a1'], [17, 'l-wohg64']]) {
+  assert.equal(LANDMARKS[index].id, id);
+  assert.ok(LANDMARKS[index].star?.radiusSolar > 0);
+}
+assert.ok(catalog.distancePc(83130) < catalog.distancePc(10818));
+assert.ok(catalog.distancePc(10818) < catalog.distancePc(25822));
+assert.ok(catalog.distancePc(25822) < catalog.distancePc(73646));
+assert.ok(catalog.distancePc(73646) < catalog.distancePc(92866));
+assert.ok(catalog.distancePc(92866) < LANDMARKS[3].distancePc);
+console.log('PASS stellar catalogue identities, physical radii, and outbound distance order');
 for (const id of ['iss', 'hubble', 'jwst']) {
   const stop = REACH_ITINERARY.find((item) => item.id === id);
   assert.equal(stop.profile, 'probe');
@@ -94,8 +113,10 @@ function hasDestination(universe, route = REACH_PRODUCTION_ROUTE) {
     if (!stop) {
       if (universe.get(id) || universe.system('c0').get(id)
         || universe.system(ALPHA_SYSTEM_ID).get(id)) return true;
-      const catalogueStar = /^s(\d+)-star$/.exec(id);
-      return !!(catalogueStar && universe.system(`c${catalogueStar[1]}`).get(id));
+      return route.stops.some((candidate) => {
+        const ref = destinationRef(candidate);
+        return ref.kind === 'star' && universe.system(ref.starId).star?.id === id;
+      });
     }
     const ref = destinationRef(stop);
     const system = universe.system(ref.kind === 'star' ? ref.starId : ref.systemId);
@@ -167,8 +188,8 @@ const run = makeRun(null, REACH_PRODUCTION_ROUTE, 'test', (state) => {
     if (state.direction === 'inbound' && state.phase.shot === 'establish')
       inspectionFixtures.set('alpha-inbound', state);
   }
-  if (state.destinationId === 'star:c83130' && state.phase.kind === 'observe')
-    inspectionFixtures.set('vega-turn', state);
+  if (state.destinationId === 'star:l17' && state.phase.kind === 'observe')
+    inspectionFixtures.set('woh-g64-turn', state);
 });
 const binary = run.universe.system(ALPHA_SYSTEM_ID);
 assert.deepEqual(binary.bodies.map((body) => body.data.type), ['barycenter', 'star', 'star']);
@@ -210,13 +231,13 @@ for (let i = 0; i < 40_000 && run.director.roundTrips === 0; i++) {
 }
 assert.equal(run.director.roundTrips, 1, 'Earth credits one full cycle');
 assert.equal(run.director.capture().direction, 'outbound');
-assert.equal(run.director.capture().cycleItineraryVersion, 5);
+assert.equal(run.director.capture().cycleItineraryVersion, 6);
 assert.equal(run.director.capture().odometer.leg, null);
 assert.deepEqual(arrivals, [...ids, ...ids.slice(0, -1).reverse()]);
-assert.equal(legs.length, 112);
+assert.equal(legs.length, 126);
 assert.deepEqual(legs, [
   ...ids.slice(1).map((id, index) => [ids[index], id]),
-  ...ids.slice(0, -1).reverse().map((id, index) => [ids[56 - index], id]),
+  ...ids.slice(0, -1).reverse().map((id, index) => [ids[ids.length - 1 - index], id]),
 ]);
 assert.equal(binaryStages.length, 18, 'one nine-shot A/B encounter in each direction');
 assert.equal(checkedStages.size, 18, 'each binary shot resumes in both directions');
@@ -241,7 +262,7 @@ for (const state of binaryBoundarySaves.filter((item) => item.phase.shot === 'es
       `${state.direction} ${id}: both stars stay inside the establishing view (${projected.toArray()})`);
   }
 }
-console.log('PASS 57 destinations, reversed return, 112 legs, round-trip and odometer accounting');
+console.log('PASS 64 destinations, reversed return, 126 legs, round-trip and odometer accounting');
 console.log('PASS production binary system, nine resumable shots in both directions');
 
 let stellarFlights = 0;
@@ -250,7 +271,7 @@ for (const saved of departureSaves) {
   if (targetStop?.profile !== 'star') continue;
   const parsed = parseReachJourney(JSON.stringify(saved), REACH_PRODUCTION_ROUTE,
     hasDestination(run.universe));
-  assert.ok(parsed, 'production departure validates');
+  assert.ok(parsed, `${targetStop.id}: production departure validates`);
   assert.equal(parsed.camera.flight, null, 'departure has no sampled cruise duration');
   const flightRun = makeRun(parsed, REACH_PRODUCTION_ROUTE, 'production');
   const cruise = until(flightRun, (state) => state.phase.kind === 'cruise');
@@ -263,7 +284,7 @@ for (const saved of departureSaves) {
     && state.phase.elapsed >= state.phase.duration / 2);
   const resumed = parseReachJourney(JSON.stringify(midway), REACH_PRODUCTION_ROUTE,
     hasDestination(flightRun.universe));
-  assert.ok(resumed, 'normal-duration star cruise reloads');
+  assert.ok(resumed, `${targetStop.id}: normal-duration star cruise reloads`);
   const resumedRun = makeRun(resumed, REACH_PRODUCTION_ROUTE, 'production');
   assert.equal(resumedRun.director.countdown.secondsLeft, flightRun.director.countdown.secondsLeft);
   assert.ok(resumedRun.camera.position.distanceTo(flightRun.camera.position) < 1e-8);
@@ -284,27 +305,27 @@ for (const saved of departureSaves) {
   }
   stellarFlights++;
 }
-assert.equal(stellarFlights, 19, 'nine stellar targets outbound and inbound, with Vega once');
+assert.equal(stellarFlights, 33, 'sixteen stellar targets outbound and inbound, with WOH G64 once');
 console.log('PASS every production star approach in both directions, 240-900s cruise, reload and framing');
 
-const vega = makeRun();
-const atVega = until(vega, (state) => state.destinationId === 'star:c83130'
+const terminal = makeRun();
+const atTerminal = until(terminal, (state) => state.destinationId === 'star:l17'
   && state.phase.kind === 'observe');
-assert.equal(atVega.direction, 'inbound');
-assert.equal(atVega.odometer.roundTrips, 0);
-assert.equal(atVega.odometer.leg, null);
-const reloadedVega = parseReachJourney(JSON.stringify(atVega), REACH_PRODUCTION_ROUTE,
-  hasDestination(vega.universe));
-assert.ok(reloadedVega);
-assert.equal(until(makeRun(reloadedVega), (state) => state.phase.kind === 'departure')
-  .phase.nextId, 'star:c7458');
+assert.equal(atTerminal.direction, 'inbound');
+assert.equal(atTerminal.odometer.roundTrips, 0);
+assert.equal(atTerminal.odometer.leg, null);
+const reloadedTerminal = parseReachJourney(JSON.stringify(atTerminal), REACH_PRODUCTION_ROUTE,
+  hasDestination(terminal.universe));
+assert.ok(reloadedTerminal);
+assert.equal(until(makeRun(reloadedTerminal), (state) => state.phase.kind === 'departure')
+  .phase.nextId, 'star:l15');
 const atEarth = run.director.capture();
 const reloadedEarth = parseReachJourney(JSON.stringify(atEarth), REACH_PRODUCTION_ROUTE,
   hasDestination(run.universe));
 assert.ok(reloadedEarth);
 assert.equal(until(makeRun(reloadedEarth), (state) => state.phase.kind === 'departure')
   .phase.nextId, 'iss');
-console.log('PASS atomic Vega and Earth reversal survives reload');
+console.log('PASS atomic WOH G64 and Earth reversal survives reload');
 
 const legacyRoute = { ...REACH_PRODUCTION_ROUTE, version: 3,
   stops: reachStopIdsForVersion(3).map((id) => REACH_ITINERARY.find((stop) => stop.id === id)) };
@@ -342,7 +363,7 @@ for (const version of [1, 2]) {
   departure.odometer.roundTrips = 3;
   const parsed = parseReachJourney(JSON.stringify(departure), REACH_PRODUCTION_ROUTE,
     hasDestination(oldRun.universe));
-  assert.ok(parsed, `v${version} departure migrates against the actual 57-stop route`);
+  assert.ok(parsed, `v${version} departure migrates against the actual 64-stop route`);
   assert.equal(parsed.transitionFromVersion, version);
   assert.deepEqual(parsed.odometer, departure.odometer);
   assert.equal(parsed.camera.flight, null);
@@ -361,7 +382,7 @@ for (const version of [1, 2]) {
   assert.equal(arrival.odometer.roundTrips, 3);
   assert.equal(arrival.transitionFromVersion, undefined);
 }
-console.log('PASS v1/v2 nonadjacent legs, persisted transition markers, and history against 57 stops');
+console.log('PASS v1/v2 nonadjacent legs, persisted transition markers, and history against 64 stops');
 
 const oldV4Route = { ...REACH_PRODUCTION_ROUTE, version: 4,
   stops: V4_STOP_IDS.map((id) => REACH_ITINERARY.find((stop) => stop.id === id)) };
@@ -398,7 +419,7 @@ oldDeparture.odometer.roundTrips = 2;
 const migratedDeparture = parseReachJourney(JSON.stringify(oldDeparture), REACH_PRODUCTION_ROUTE,
   hasDestination(oldV4.universe));
 assert.ok(migratedDeparture);
-assert.equal(migratedDeparture.itinerary.version, 5);
+assert.equal(migratedDeparture.itinerary.version, 6);
 assert.equal(migratedDeparture.routeIndex, ids.indexOf('hubble'));
 assert.equal(migratedDeparture.cycleItineraryVersion, 4);
 assert.equal(migratedDeparture.transitionFromVersion, 4);
@@ -483,25 +504,74 @@ assert.deepEqual(returnVisits.slice(0, 3), ['hubble', 'iss', 'earth']);
 const returnedV4 = resumedInbound.director.capture();
 assert.equal(returnedV4.destinationId, 'earth');
 assert.equal(returnedV4.odometer.roundTrips, 1);
-assert.equal(returnedV4.cycleItineraryVersion, 5);
+assert.equal(returnedV4.cycleItineraryVersion, 6);
 assert.equal(until(resumedInbound, (state) => state.phase.kind === 'departure').phase.nextId, 'iss');
 console.log('PASS old v4 inbound order finishes, counts trip, then adopts new route');
+
+const oldV5Route = { ...REACH_PRODUCTION_ROUTE, version: 5,
+  stops: V5_STOP_IDS.map((id) => REACH_ITINERARY.find((stop) => stop.id === id)) };
+const oldV5Outbound = makeRun(null, oldV5Route);
+const oldVegaFlight = until(oldV5Outbound, (state) => state.destinationId === 'star:c83130'
+  && state.direction === 'outbound' && state.phase.kind === 'cruise');
+const migratedVegaFlight = parseReachJourney(JSON.stringify(oldVegaFlight), REACH_PRODUCTION_ROUTE,
+  hasDestination(oldV5Outbound.universe));
+assert.ok(migratedVegaFlight);
+assert.equal(migratedVegaFlight.transitionFromVersion, 5);
+const continuedVega = makeRun(migratedVegaFlight);
+const v6Vega = until(continuedVega, (state) => state.destinationId === 'star:c83130'
+  && state.phase.kind === 'observe');
+assert.equal(v6Vega.direction, 'outbound');
+assert.equal(until(continuedVega, (state) => state.phase.kind === 'departure').phase.nextId,
+  'star:c10818');
+assert.equal(continuedVega.director.capture().cycleItineraryVersion, 6);
+const oldV5 = makeRun(null, oldV5Route);
+const oldVega = until(oldV5, (state) => state.destinationId === 'star:c83130'
+  && state.phase.kind === 'observe');
+assert.equal(oldVega.direction, 'inbound');
+oldVega.odometer.completedKm = 123_456_789;
+const migratedV5 = parseReachJourney(JSON.stringify(oldVega), REACH_PRODUCTION_ROUTE,
+  hasDestination(oldV5.universe));
+assert.ok(migratedV5);
+assert.equal(migratedV5.itinerary.version, 6);
+assert.equal(migratedV5.cycleItineraryVersion, 5);
+assert.equal(migratedV5.odometer.completedKm, oldVega.odometer.completedKm);
+assert.equal(until(makeRun(migratedV5), (state) => state.phase.kind === 'departure')
+  .phase.nextId, 'star:c7458');
+const oldV5Inbound = until(oldV5, (state) => state.destinationId === 'star:c80155'
+  && state.direction === 'inbound' && state.phase.kind === 'cruise');
+const migratedV5Flight = parseReachJourney(JSON.stringify(oldV5Inbound), REACH_PRODUCTION_ROUTE,
+  hasDestination(oldV5.universe));
+assert.ok(migratedV5Flight);
+assert.equal(migratedV5Flight.transitionFromVersion, 5);
+const v5ReturnVisits = [];
+const resumedV5 = makeRun(migratedV5Flight, REACH_PRODUCTION_ROUTE, 'test', (state) => {
+  if (state.phase.kind === 'observe' || state.phase.kind === 'flyby'
+    || state.phase.kind === 'binary' && state.phase.shot === 'establish')
+    v5ReturnVisits.push(state.destinationId);
+});
+const v5Earth = until(resumedV5, (state) => state.destinationId === 'earth'
+  && state.phase.kind === 'observe' && state.odometer.roundTrips === 1);
+assert.equal(v5Earth.cycleItineraryVersion, 6);
+assert.equal(until(resumedV5, (state) => state.phase.kind === 'departure').phase.nextId, 'iss');
+assert.ok(v5ReturnVisits.every((id) => V5_STOP_IDS.includes(id)),
+  'a pinned v5 return skips added destinations');
+console.log('PASS v5 outbound extension, inbound migration, odometer, and v6 adoption at Earth');
 
 assert.ok(inboundSnapshot);
 const futureStop = { id: 'future:additional', profile: 'star', label: 'Future stop',
   ref: { kind: 'star', starId: 'c64548' } };
-const futureRoute = { ...REACH_PRODUCTION_ROUTE, version: 6,
+const futureRoute = { ...REACH_PRODUCTION_ROUTE, version: 7,
   stops: [...REACH_ITINERARY.slice(0, 49), futureStop, ...REACH_ITINERARY.slice(49)] };
 const futureSaved = parseReachJourney(JSON.stringify(inboundSnapshot), futureRoute,
   hasDestination(run.universe, futureRoute));
 assert.ok(futureSaved);
-assert.equal(futureSaved.cycleItineraryVersion, 5);
-assert.equal(futureSaved.transitionFromVersion, 5);
+assert.equal(futureSaved.cycleItineraryVersion, 6);
+assert.equal(futureSaved.transitionFromVersion, 6);
 const futureIntermediate = makeRun(futureSaved, futureRoute).director.capture();
 const futureReloaded = parseReachJourney(JSON.stringify(futureIntermediate), futureRoute,
   hasDestination(run.universe, futureRoute));
 assert.ok(futureReloaded);
-assert.equal(futureReloaded.transitionFromVersion, 5);
+assert.equal(futureReloaded.transitionFromVersion, 6);
 const futureVisits = [];
 const futureRun = makeRun(futureReloaded, futureRoute, 'test', (state) => {
   if (state.phase.kind === 'observe' || state.phase.kind === 'flyby'
@@ -512,9 +582,9 @@ until(futureRun, (state) => state.destinationId === 'earth'
   && state.phase.kind === 'observe' && state.odometer.roundTrips === 1);
 assert.equal(futureVisits[0], 'star:c80155', 'the active inbound leg keeps its saved target');
 assert.ok(!futureVisits.includes(futureStop.id), 'expanded stop is skipped on pinned inbound cycle');
-assert.equal(futureRun.director.capture().cycleItineraryVersion, 6);
+assert.equal(futureRun.director.capture().cycleItineraryVersion, 7);
 assert.equal(until(futureRun, (state) => state.phase.kind === 'departure').phase.nextId, 'iss');
-console.log('PASS inbound cycle remains on v5 after a simulated v6 expansion');
+console.log('PASS inbound cycle remains on v6 after a simulated v7 expansion');
 
 const previousChannel = globalThis.BroadcastChannel;
 const previousWindow = globalThis.window;
