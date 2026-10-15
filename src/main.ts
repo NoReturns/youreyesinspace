@@ -74,6 +74,7 @@ const REACH_PREVIEW_ROUTE = REACH_PREVIEW_ID ? reachPreviewRoute(REACH_PREVIEW_I
 if (REACH_PREVIEW_ID && !REACH_PREVIEW_ROUTE) throw new Error(`Unknown Reach preview stop: ${REACH_PREVIEW_ID}`);
 const REACH_ROUND_TRIP_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:woh-tarantula';
 const REACH_ALPHA_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:alpha-centauri';
+const REACH_SGRA_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:sgra';
 const REACH_PREVIEW_STAR_ID = REACH_PREVIEW_ROUTE?.stops[1]?.ref?.kind === 'star'
   ? REACH_PREVIEW_ROUTE.stops[1].ref.starId : null;
 const REACH_STAR_ENCOUNTER_ID = REACH_ALPHA_PREVIEW ? ALPHA_SYSTEM_ID
@@ -172,6 +173,9 @@ class App implements UIHost {
   private starLuminosity = 1;
   private reachInfoSide: ReachInfoSide | null = null;
   private frameCheckAcc = 0;
+  private readonly sgraFrameIntervals: number[] = [];
+  private sgraDiagnostics: HTMLPreElement | null = null;
+  private sgraLastDiagnostic = 0;
   private galaxyCheckAcc = 1;
   private galaxyBoost = 0;
   private readonly maxPointPx: number;
@@ -225,7 +229,7 @@ class App implements UIHost {
       this.time.jd = savedJourney.simulation.jd;
       if (savedJourney.frame.starId !== this.universe.current.starId)
         this.universe.switchTo(savedJourney.frame.starId, this.time.jd, this.time.t);
-    } else if (REACH_ROUND_TRIP_PREVIEW) {
+    } else if (REACH_ROUND_TRIP_PREVIEW || REACH_SGRA_PREVIEW) {
       this.universe.switchTo(destinationSystem(REACH_ROUTE.stops[0]), this.time.jd, this.time.t);
     }
     // Evaluate once so orbital elements exist before building renderers
@@ -324,6 +328,12 @@ class App implements UIHost {
         REACH_ALPHA_PREVIEW ? 'top-centre' : odometer.position) : null;
       this.reachCountdown?.update(performance.now());
       this.reachOdometer?.update(performance.now());
+      if (REACH_SGRA_PREVIEW) {
+        this.sgraDiagnostics = document.createElement('pre');
+        this.sgraDiagnostics.id = 'reach-sgra-diagnostics';
+        this.sgraDiagnostics.hidden = true;
+        document.body.appendChild(this.sgraDiagnostics);
+      }
       if (REACH_ALPHA_PREVIEW) {
         Object.defineProperty(window, '__reachAlphaStatus', {
           value: () => this.alphaPreviewStatus(), configurable: false,
@@ -1369,6 +1379,10 @@ class App implements UIHost {
     if (!REACH_FLICKER) requestAnimationFrame(this.frame);
     const frameStarted = this.arrivalTrace ? performance.now() : 0;
     const intervalMs = now - this.last;
+    if (REACH_SGRA_PREVIEW && intervalMs > 0 && intervalMs < 1000) {
+      this.sgraFrameIntervals.push(intervalMs);
+      if (this.sgraFrameIntervals.length > 180) this.sgraFrameIntervals.shift();
+    }
     const dt = Math.min(0.1, Math.max(0.0001, (now - this.last) / 1000));
     this.last = now;
     const follower = this.panorama?.isPrimaryDisplay === false;
@@ -1703,6 +1717,17 @@ class App implements UIHost {
         phase: this.reach?.countdown.phase ?? 'none', flightS: flight ? flight.duration - flight.t : null,
         visibility: document.visibilityState },
       this.camera.position, this.camera.quaternion);
+    }
+    if (this.sgraDiagnostics && now - this.sgraLastDiagnostic >= 1000) {
+      this.sgraLastDiagnostic = now;
+      this.sgraDiagnostics.textContent = JSON.stringify({ ...this.reach?.sagittariusPreviewStatus,
+        fps: this.sgraFrameIntervals.length
+          ? 1000 * this.sgraFrameIntervals.length
+            / this.sgraFrameIntervals.reduce((sum, interval) => sum + interval, 0) : null,
+        viewport: [eng.width, eng.height],
+        drawingBuffer: [eng.renderer.domElement.width, eng.renderer.domElement.height],
+        quality: eng.blackHole.quality, lensing: eng.blackHole.enabled,
+      });
     }
   };
 

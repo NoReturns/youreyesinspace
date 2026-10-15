@@ -19,6 +19,7 @@ import { destinationRef, destinationSystem, REACH_NEARBY_OBSERVATION_RADII,
   type ReachRoute, type ReachStop } from './ReachDestinations';
 import { reachArrivalTraceEnabled } from './ReachArrivalTrace';
 import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, ALPHA_SYSTEM_ID, ReachAlphaCinematic } from './ReachAlphaCentauri';
+import { ReachSagittariusPreview } from './ReachSagittariusPreview';
 
 type Stop = ReachStop;
 export const REACH_ALPHA_DESTINATION_ID = 'alpha-centauri-ab';
@@ -117,6 +118,9 @@ export function reachLandmarkObservationDistance(radiusKm: number, verticalFovRa
 
 /** Development-only routes are isolated from the production itinerary. */
 export function reachPreviewRoute(id: string): ReachRoute | null {
+  if (id === 'sgra') return { id: 'preview:sgra', version: 1, repeat: false,
+    stops: [{ id: 'sgra', profile: 'star', label: 'Sagittarius A*',
+      ref: { kind: 'body', systemId: 'b0', bodyId: 'sgra' } }] };
   if (id === 'woh-tarantula') return { id: 'preview:woh-tarantula', version: 1, repeat: true,
     stops: [REACH_ITINERARY[REACH_ITINERARY.length - 1],
       { id: 'l-30dor', profile: 'landmark', label: 'Tarantula Nebula (30 Doradus)',
@@ -208,9 +212,12 @@ export class ReachVoyageDirector {
   } | null = null;
   private readonly stops: readonly ReachStop[];
   private alpha: ReachAlphaCinematic | null = null;
+  private sagittarius: ReachSagittariusPreview | null = null;
 
-  get directing(): boolean { return !!this.alpha || this.stage === 'departure' || this.stage === 'flyby'; }
+  get directing(): boolean { return !!this.sagittarius || !!this.alpha || this.stage === 'departure' || this.stage === 'flyby'; }
   get observation(): { stop: ReachStop; elapsed: number; remaining: number; departing: boolean } | null {
+    if (this.sagittarius) return { stop: this.stops[0],
+      elapsed: Math.min(this.sagittarius.elapsed, 20), remaining: 20, departing: false };
     if (this.stage !== 'observe') return null;
     const remaining = this.alpha ? this.alpha.observationRemaining : this.observeLeft;
     const elapsed = this.alpha ? this.alpha.observationElapsed : Math.max(0, this.observeDuration - remaining);
@@ -218,6 +225,11 @@ export class ReachVoyageDirector {
       departing: this.route.repeat || this.stop < this.stops.length - 1 };
   }
   get alphaPreview(): boolean { return this.route.id === 'preview:alpha-centauri'; }
+  get sagittariusPreviewStatus(): { shot: string; elapsed: number; distanceRs: number } | null {
+    if (!this.sagittarius) return null;
+    return { shot: this.sagittarius.shot, elapsed: this.sagittarius.elapsed,
+      distanceRs: this.camera.position.distanceTo(this.sagittarius.body.position) / this.sagittarius.body.radius };
+  }
   get alphaCinematic(): ReachAlphaCinematic | null { return this.alpha; }
   get roundTrips(): number { return this.roundTripCount; }
   get cameraTargetId(): string { return this.camera.target?.id ?? this.stops[this.stop].id; }
@@ -270,6 +282,12 @@ export class ReachVoyageDirector {
     if (saved) { this.restore(saved); return; }
     const initial = this.stops[0];
     const body = this.destination(initial);
+    if (route.id === 'preview:sgra') {
+      this.sagittarius = new ReachSagittariusPreview(body, camera);
+      this.observeDuration = this.sagittarius.duration;
+      this.observeLeft = this.observeDuration;
+      return;
+    }
     const view = initial.profile === 'star'
       ? new Vector3(0, 0.3, 1).normalize()
       : new Vector3().subVectors(universe.star.position, body.position).normalize()
@@ -403,6 +421,11 @@ export class ReachVoyageDirector {
 
   update(dt: number, paused: boolean): void {
     if (paused) return;
+    if (this.sagittarius) {
+      this.sagittarius.update(dt);
+      this.observeLeft = this.observeDuration - (this.sagittarius.elapsed % this.observeDuration);
+      return;
+    }
     if (this.alpha) {
       if (this.alpha.update(dt)) {
         if (this.route.id === 'preview:alpha-centauri') {

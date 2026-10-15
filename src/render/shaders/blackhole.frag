@@ -70,15 +70,15 @@ void main() {
   vec3 toBH = uBHPos / D;
   float cosT = clamp(dot(d, toBH), -1.0, 1.0);
   float theta = acos(cosT);
+  // Both regimes must approach the same source direction at the handoff.
+  float delta = (2.0 / D) / max(theta, 1e-4);
+  vec3 perp = normalize(toBH - cosT * d);
+  vec3 weakSrc = normalize(d * cos(delta) + perp * sin(delta));
 
   if (theta > uRegionAngle) {
     // Weak-field lens: the observed direction θ came from a source at β = θ − θ_E²/θ
-    float thetaE2 = 2.0 / D;
-    float delta = thetaE2 / max(theta, 1e-4);
     if (delta < 1e-5 || (uBHPos.z > 0.0 && theta > PI * 0.5)) { gl_FragColor = vec4(base, 1.0); return; }
-    vec3 perp = normalize(toBH - cosT * d); // in-plane direction from d toward the hole
-    vec3 src = normalize(d * cos(delta) + perp * sin(delta));
-    gl_FragColor = vec4(background(src), 1.0);
+    gl_FragColor = vec4(background(weakSrc), 1.0);
     return;
   }
 
@@ -114,9 +114,16 @@ void main() {
     if (uDiskBright > 0.0) {
       float hN = dot(pN, uDiskNormal);
       if (hN * hPrev < 0.0) {
-        // crossing of the disk plane: interpolate the radius
+        // Resolve the plane crossing on the geodesic. Cartesian endpoint
+        // interpolation cuts across the curved ray near the photon sphere.
         float f = hPrev / (hPrev - hN);
-        vec3 pc = mix(p, pN, f);
+        vec2 sc = rk4(s, h * f);
+        float phiC = phi + h * f;
+        vec3 pc = (cos(phiC) * e1 + sin(phiC) * e2) / sc.x;
+        f = clamp(f - dot(pc, uDiskNormal) / (hN - hPrev), 0.0, 1.0);
+        sc = rk4(s, h * f);
+        phiC = phi + h * f;
+        pc = (cos(phiC) * e1 + sin(phiC) * e2) / sc.x;
         float rc = length(pc);
         if (rc > uDiskInner && rc < uDiskOuter) {
           // Keplerian velocity and relativistic Doppler + gravitational shift
@@ -152,7 +159,11 @@ void main() {
     float r = 1.0 / s.x;
     float dr = -s.y / (s.x * s.x);
     vec3 outDir = normalize(dr * (cos(phi) * e1 + sin(phi) * e2) + r * (-sin(phi) * e1 + cos(phi) * e2));
-    bg = background(outDir);
+    // Trace through the disk well inside the handoff, then converge to the
+    // weak-field solution by interpolating source directions before sampling.
+    // One background lookup avoids doubled stars or a colour-blend ring.
+    float handoff = smoothstep(uRegionAngle * 0.8, uRegionAngle, theta);
+    bg = background(normalize(mix(outDir, weakSrc, handoff)));
     // higher-order images (rays that looped around the hole) are dimmed: with a sprite-based
     // background they would otherwise turn into a noisy moiré band at the photon ring
     bg *= 1.0 - 0.7 * smoothstep(1.4 * PI, 2.2 * PI, phi);
