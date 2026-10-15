@@ -28,6 +28,7 @@ import { destinationRef, reachPilotStarAppearance, reachStarVisualDrift, REACH_P
 import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
 import { ReachScaleComparison, scalePreviewEnabled } from './reach/ReachScaleComparison';
 import { ReachOdometerOverlay, readOdometerContract } from './reach/ReachOdometer';
+import { reachInfoOpacity, reachInfoPlacement, reachInfoTarget, type ReachInfoSide } from './reach/ReachInfoCard';
 import { ReachPanoramaSync, readReachPanorama } from './reach/ReachPanorama';
 import { LocalStorageReachJourneyStore, REACH_PROXIMA_PILOT_KEY, inspectReachJourneyStore, saveReachJourney, type ReachJourneyState, type ReachJourneyStore } from './reach/JourneyState';
 import { ReachTiming } from './reach/ReachTiming';
@@ -166,6 +167,7 @@ class App implements UIHost {
   private readonly camForward = new Vector3();
   private readonly sunColor = new Vector3(1, 1, 1);
   private starLuminosity = 1;
+  private reachInfoSide: ReachInfoSide | null = null;
   private frameCheckAcc = 0;
   private galaxyCheckAcc = 1;
   private galaxyBoost = 0;
@@ -304,6 +306,7 @@ class App implements UIHost {
       this.uiVisible = false;
     } else if (REACH_MODE) {
       this.surfacePreview = null;
+      this.ui.enableReachInfo();
       this.reach = new ReachVoyageDirector(this.universe, this.camera, this.time,
         new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach(), REACH_ROUTE);
       const countdown = readCountdownContract(true);
@@ -1638,6 +1641,24 @@ class App implements UIHost {
       this.reachScale.draw(starView, eng.camera, eng.width, eng.height, this.overlay.dpr);
     const selDist = this.selected ? this.bodies.byId.get(this.selected.id)?.distance ?? 0 : 0;
     if (!REACH_MODE) this.ui.update(now, dt, selDist);
+    else if (this.reach) {
+      const observation = this.reach.observation;
+      const target = reachInfoTarget(observation, this.panorama?.isPrimaryDisplay !== false, destinationRef);
+      const targetSystem = target?.kind === 'star' ? target.starId : target?.systemId;
+      const body = targetSystem === this.universe.current.starId
+        ? target?.kind === 'star' ? this.universe.current.star : target ? this.universe.get(target.bodyId) : null
+        : null;
+      const placement = body ? (() => {
+        const projected = new Vector3().subVectors(body.position, camPos).project(eng.camera);
+        const radius = this.bodies.byId.get(body.id)?.apparentRadiusPx
+          ?? Math.atan2(body.radius, body.position.distanceTo(camPos)) * pxPerRad;
+        return reachInfoPlacement(projected.x, projected.y, radius,
+          eng.width, eng.height, this.reachInfoSide);
+      })() : null;
+      if (placement) this.reachInfoSide = placement.side;
+      this.ui.updateReachInfo(body ?? null, target?.kind === 'star' && body ? target.starId : null,
+        placement, reachInfoOpacity(observation));
+    }
     if (this.arrivalTrace && this.universe.current.starId === 'c64548') {
       const view = this.bodies.byId.get(star.id);
       const flight = this.camera.autopilot;

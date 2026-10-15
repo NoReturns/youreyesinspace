@@ -295,6 +295,34 @@ input[type=range] { width: 120px; accent-color: var(--accent); }
 
 /* ---------- Info panel (object entry) ---------- */
 #info { top: 66px; left: 16px; width: 330px; max-height: calc(100vh - 210px); overflow-y: auto; }
+body.reach-mode #info {
+  position: fixed; z-index: 12; box-sizing: border-box;
+  top: 50%; bottom: auto; transform: translateY(-50%) scale(var(--reach-card-scale, 1));
+  width: min(400px, calc(50vw - 32px));
+  max-height: none; overflow-y: visible;
+  pointer-events: none; overflow-wrap: anywhere;
+}
+body.reach-mode #info[data-side='left'] { left: 16px; right: auto; transform-origin: left center; }
+body.reach-mode #info[data-side='right'] { right: 16px; left: auto; transform-origin: right center; }
+body.reach-mode #info[data-vertical='top'] { top: 48px; bottom: auto; transform: scale(var(--reach-card-scale, 1)); }
+body.reach-mode #info[data-vertical='bottom'] { top: auto; bottom: 48px; transform: scale(var(--reach-card-scale, 1)); }
+body.reach-mode #info[data-side='left'][data-vertical='top'] { transform-origin: left top; }
+body.reach-mode #info[data-side='right'][data-vertical='top'] { transform-origin: right top; }
+body.reach-mode #info[data-side='left'][data-vertical='bottom'] { transform-origin: left bottom; }
+body.reach-mode #info[data-side='right'][data-vertical='bottom'] { transform-origin: right bottom; }
+body.reach-mode #info .info-head-btns,
+body.reach-mode #info .info-actions { display: none !important; }
+body.reach-mode #info .info-grid,
+body.reach-mode #info .info-desc { display: grid; }
+body.reach-mode #info .info-desc { display: block; }
+@media (max-width: 500px) {
+  body.reach-mode #info { padding: 8px; width: calc(50vw - 20px); }
+  body.reach-mode #info[data-side='left'] { left: 8px; }
+  body.reach-mode #info[data-side='right'] { right: 8px; }
+  body.reach-mode #info .info-grid { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  body.reach-mode #info .info-grid dd { text-align: left; margin-bottom: 5px; }
+  body.reach-mode #info h2 { font-size: 17px; }
+}
 .info-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .info-head-btns { display: flex; gap: 4px; flex: none; }
 #info-expand { display: none; }

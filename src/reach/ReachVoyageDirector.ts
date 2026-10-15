@@ -196,6 +196,12 @@ export class ReachVoyageDirector {
   private alpha: ReachAlphaCinematic | null = null;
 
   get directing(): boolean { return !!this.alpha || this.stage === 'departure' || this.stage === 'flyby'; }
+  get observation(): { stop: ReachStop; elapsed: number; remaining: number; departing: boolean } | null {
+    if (this.stage !== 'observe') return null;
+    const remaining = this.alpha ? this.alpha.secondsLeft : this.observeLeft;
+    return { stop: this.stops[this.stop], elapsed: Math.max(0, this.observeDuration - remaining), remaining,
+      departing: this.route.repeat || this.stop < this.stops.length - 1 };
+  }
   get alphaPreview(): boolean { return this.route.id === 'preview:alpha-centauri'; }
   get alphaCinematic(): ReachAlphaCinematic | null { return this.alpha; }
   get roundTrips(): number { return this.roundTripCount; }

@@ -1,4 +1,5 @@
 import type { CelestialBody } from '../core/CelestialBody';
+import type { ReachInfoPlacement } from '../reach/ReachInfoCard';
 import { MissionPanel, type MissionPanelHost } from './MissionPanel';
 import { TourPanel } from './TourPanel';
 import type { TourPlayer } from '../core/TourPlayer';
@@ -143,6 +144,7 @@ export class UI {
   readonly missionPanel: MissionPanel;
   readonly tourPanel: TourPanel;
   private lastInfoUpdate = 0;
+  private reachInfoId: string | null = null;
   private toastTimer = 0;
   private searchIndex = -1;
   private fpsAcc = 0;
@@ -168,6 +170,38 @@ export class UI {
     if (window.matchMedia('(max-width: 700px)').matches) this.info.classList.add('collapsed');
     $('info-expand').addEventListener('click', () => this.info.classList.toggle('collapsed'));
     $('info-close').addEventListener('click', () => { host.select(null); host.selectStar(null); host.selectGalaxy(null); host.selectLandmark(null); });
+  }
+
+  enableReachInfo(): void {
+    this.info.classList.remove('collapsed');
+    document.body.appendChild(this.info);
+  }
+
+  updateReachInfo(body: CelestialBody | null, starId: StarId | null,
+    placement: ReachInfoPlacement | null, opacity: number): void {
+    const id = starId ?? body?.id ?? null;
+    if (!id || !placement) {
+      this.info.hidden = true;
+      this.reachInfoId = null;
+      return;
+    }
+    this.info.hidden = false;
+    this.info.dataset.side = placement.side;
+    this.info.dataset.vertical = placement.vertical;
+    this.info.style.width = `${placement.width}px`;
+    this.info.style.opacity = String(opacity);
+    if (id !== this.reachInfoId) {
+      this.reachInfoId = id;
+      this.lastInfoUpdate = -Infinity;
+    }
+    const now = performance.now();
+    if (now - this.lastInfoUpdate < 250) return;
+    this.lastInfoUpdate = now;
+    if (starId) this.renderStarInfo(starId);
+    else if (body) this.renderInfo(body, body.position.distanceTo(this.host.camera.position));
+    const availableHeight = Math.max(80, placement.availableHeight);
+    this.info.style.setProperty('--reach-card-scale',
+      String(Math.min(1, availableHeight / this.info.scrollHeight)));
   }
 
   /* ---------------- Time ---------------- */
