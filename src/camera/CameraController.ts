@@ -241,11 +241,12 @@ export class CameraController {
    * Fly to a fixed point of the current frame (e.g. a galaxy centre) and stop `arriveDist` km
    * away, approaching along `approachDir` (unit, from the point toward the camera's final spot).
    */
-  goToPoint(point: Vector3, arriveDist: number, approachDir?: Vector3, anchor?: { radius: number; name: string }): void {
+  goToPoint(point: Vector3, arriveDist: number, approachDir?: Vector3,
+    anchor?: { radius: number; name: string }, durationS?: number): void {
     const r0 = _v.copy(this.position).sub(point);
     const dir1 = approachDir ? approachDir.clone().normalize() : (r0.lengthSq() > 0 ? r0.clone().normalize() : new Vector3(0, 0.3, 1).normalize());
     const ratio = Math.max(r0.length(), 1) / arriveDist;
-    const duration = 3 + Math.min(6, Math.abs(Math.log10(ratio)) * 1.1);
+    const duration = durationS ?? 3 + Math.min(6, Math.abs(Math.log10(ratio)) * 1.1);
     this.autopilot = {
       kind: 'gotoPoint', target: null, point: point.clone(), anchor, t: 0, duration,
       r0: r0.clone(), dir1, dist1: arriveDist, q0: this.quaternion.clone(),

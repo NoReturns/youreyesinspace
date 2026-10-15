@@ -3,7 +3,8 @@ import { ALPHA_BARY_ID, ALPHA_SYSTEM_ID, ALPHA_A_INDEX, ALPHA_B_INDEX } from './
 
 export type ReachDestinationRef =
   | { kind: 'body'; systemId: string; bodyId: string }
-  | { kind: 'star'; starId: string };
+  | { kind: 'star'; starId: string }
+  | { kind: 'landmark'; landmarkId: string };
 
 export interface ReachStop extends ReachTimingDestination {
   /** Stable route identity; legacy Solar stops retain their existing body IDs. */
@@ -79,7 +80,7 @@ export function destinationRef(stop: ReachStop): ReachDestinationRef {
 
 export function destinationSystem(stop: ReachStop): string {
   const ref = destinationRef(stop);
-  return ref.kind === 'star' ? ref.starId : ref.systemId;
+  return ref.kind === 'star' ? ref.starId : ref.kind === 'landmark' ? 'c0' : ref.systemId;
 }
 
 /** Bounded wall-clock drift: stable through simulation rate changes and shared by panorama windows. */

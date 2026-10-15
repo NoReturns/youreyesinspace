@@ -179,8 +179,9 @@ export class UI {
   }
 
   updateReachInfo(body: CelestialBody | null, starId: StarId | null,
-    placement: ReachInfoPlacement | null, opacity: number): void {
-    const id = starId ?? body?.id ?? null;
+    placement: ReachInfoPlacement | null, opacity: number, landmarkIndex: number | null = null): void {
+    const id = landmarkIndex === null ? starId ?? body?.id ?? null
+      : this.host.universe.landmarks[landmarkIndex]?.def.id ?? null;
     if (!id || !placement) {
       this.info.hidden = true;
       this.reachInfoId = null;
@@ -198,7 +199,8 @@ export class UI {
     const now = performance.now();
     if (now - this.lastInfoUpdate < 250) return;
     this.lastInfoUpdate = now;
-    if (starId) this.renderStarInfo(starId);
+    if (landmarkIndex !== null) this.renderLandmarkInfo(landmarkIndex);
+    else if (starId) this.renderStarInfo(starId);
     else if (body) this.renderInfo(body, body.position.distanceTo(this.host.camera.position));
     const availableHeight = Math.max(80, placement.availableHeight);
     this.info.style.setProperty('--reach-card-scale',
@@ -661,7 +663,8 @@ export class UI {
     for (const [k, v] of Object.entries(d.facts)) rows.push([k, v]);
     rows.push(['Işık gecikmesi', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
-    this.infoDesc.textContent = `${d.description} ${_('(Görsel: gerçek konum ve boyutta prosedürel bir temsil; fotoğraf değildir.)')}`;
+    this.infoDesc.textContent = document.body.classList.contains('reach-mode') ? d.description
+      : `${d.description} ${_('(Görsel: gerçek konum ve boyutta prosedürel bir temsil; fotoğraf değildir.)')}`;
   }
 
   private renderStarInfo(id: StarId): void {

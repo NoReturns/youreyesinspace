@@ -1,5 +1,5 @@
 import type { ReachOdometerState } from './ReachOdometer';
-import { LANDMARKS } from '../data/landmarks';
+import { LANDMARKS, isSystemLandmark } from '../data/landmarks';
 import { destinationRef, destinationSystem, type ReachRoute, type ReachStop } from './ReachDestinations';
 import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, alphaShotSeconds } from './ReachAlphaCentauri';
 
@@ -229,11 +229,15 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
     ? currentRef.starId.startsWith('l')
       ? LANDMARKS[Number(currentRef.starId.slice(1))]?.id
       : `s${currentRef.starId.slice(1)}-star`
-    : currentRef.bodyId;
+    : currentRef.kind === 'landmark' ? currentRef.landmarkId : currentRef.bodyId;
+  const pointDestination = currentRef.kind === 'landmark';
   const expectedFrame = destinationSystem(destination);
-  if (state.frame.starId !== expectedFrame || state.camera.referenceId !== expectedBodyId) return null;
+  if (pointDestination && (!LANDMARKS.some((entry) => entry.id === expectedBodyId && !isSystemLandmark(entry))
+    || destination.id !== expectedBodyId)) return null;
+  if (state.frame.starId !== expectedFrame
+    || state.camera.referenceId !== (pointDestination ? 'sun' : expectedBodyId)) return null;
   const binaryTargets = [ALPHA_BARY_ID, `s${ALPHA_A_INDEX}-star`, `s${ALPHA_B_INDEX}-star`];
-  if (phase.kind !== 'binary' && state.camera.referenceId !== state.camera.targetId) return null;
+  if (phase.kind !== 'binary' && state.camera.targetId !== expectedBodyId) return null;
   if (phase.kind !== 'observe' && state.camera.autoOrbit !== 0) return null;
   if (phase.kind === 'observe') {
     if (destination.profile === 'moon' || state.camera.flight !== null) return null;
@@ -249,9 +253,11 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
           ? predecessor(transitionIds, state.destinationId) : successor(transitionIds, state.destinationId)
         : direction === 'inbound' ? predecessor(cycleIds, state.destinationId)
           : successor(cycleIds, state.destinationId))
-      || !nonzeroVec(phase.offset) || !quat(phase.orientation) || !unit(phase.up)
+      || !(pointDestination ? interstellarVec3(phase.offset) && phase.offset.some((n) => n !== 0)
+        : nonzeroVec(phase.offset)) || !quat(phase.orientation) || !unit(phase.up)
       || !finite(phase.orbitRate) || Math.abs(phase.orbitRate) > 1
-      || !finite(phase.radialSpeed) || !finite(phase.endRadius) || phase.endRadius <= 0 || phase.endRadius >= 1e15
+      || !finite(phase.radialSpeed) || !finite(phase.endRadius) || phase.endRadius <= 0
+      || phase.endRadius >= (pointDestination ? 1e21 : 1e15)
       || state.camera.flight !== null) return null;
   } else if (phase.kind === 'cruise') {
     const flight = state.camera.flight;
@@ -260,7 +266,8 @@ export function parseReachJourney(raw: string | null, routeInput: readonly Reach
       || flight.duration !== phase.duration || flight.elapsed !== phase.elapsed
       || !interstellarVec3(flight.startOffset) || flight.startOffset.every((n) => n === 0)
       || !unit(flight.endDirection)
-      || !finite(flight.endDistance) || flight.endDistance <= 0 || flight.endDistance >= 1e15
+      || !finite(flight.endDistance) || flight.endDistance <= 0
+      || flight.endDistance >= (pointDestination ? 1e21 : 1e15)
       || !quat(flight.startOrientation) || (flight.up !== null && !unit(flight.up))
       || typeof flight.gentleStart !== 'boolean'
       || (flight.cinematicCruise !== undefined && typeof flight.cinematicCruise !== 'boolean')

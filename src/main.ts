@@ -200,6 +200,7 @@ class App implements UIHost {
         const stop = REACH_ROUTE.stops.find((candidate) => candidate.id === id);
         if (stop) {
           const ref = destinationRef(stop);
+          if (ref.kind === 'landmark') return !!this.universe.landmark(ref.landmarkId);
           const system = this.universe.system(ref.kind === 'star' ? ref.starId : ref.systemId);
           return !!(ref.kind === 'star' ? system.star : system.get(ref.bodyId));
         }
@@ -308,7 +309,8 @@ class App implements UIHost {
       this.surfacePreview = null;
       this.ui.enableReachInfo();
       this.reach = new ReachVoyageDirector(this.universe, this.camera, this.time,
-        new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach(), REACH_ROUTE);
+        new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach(), REACH_ROUTE,
+        this.engine.camera.fov * Math.PI / 180);
       const countdown = readCountdownContract(true);
       this.reachCountdown = countdown ? new ReachCountdownOverlay(this.reach,
         REACH_ALPHA_PREVIEW ? 'top-centre' : countdown.position) : null;
@@ -1389,11 +1391,16 @@ class App implements UIHost {
     if (shared) {
       const reference = this.universe.get(shared.referenceId);
       const target = this.universe.get(shared.targetId);
-      if (!reference || !target) return;
+      const landmark = target ? null : this.universe.landmark(shared.targetId);
+      if (!reference || (!target && !landmark)) return;
       this.camera.position.fromArray(shared.position);
       this.camera.quaternion.fromArray(shared.orientation);
       if (this.camera.reference !== reference) this.camera.setReference(reference);
-      this.camera.target = target;
+      this.camera.target = target ?? null;
+      this.camera.anchor = landmark ? {
+        position: this.universe.landmarkRelative(this.universe.landmarks.indexOf(landmark), new Vector3()),
+        radius: landmark.def.radiusPc * PARSEC_KM * 0.3, name: landmark.def.name,
+      } : null;
       this.camera.mode = 'orbit';
     } else if (this.surfacePreview) {
       this.surfacePreview.update(dt, this.time.paused);
@@ -1413,7 +1420,7 @@ class App implements UIHost {
         starId: this.universe.current.starId,
         position: [position.x, position.y, position.z],
         orientation: [orientation.x, orientation.y, orientation.z, orientation.w],
-        referenceId: this.camera.reference!.id, targetId: this.camera.target!.id,
+        referenceId: this.camera.reference!.id, targetId: this.reach.cameraTargetId,
         destinationId: countdown.destinationId, phase: countdown.phase, secondsLeft: countdown.secondsLeft,
       });
     }
@@ -1644,20 +1651,28 @@ class App implements UIHost {
     else if (this.reach) {
       const observation = this.reach.observation;
       const target = reachInfoTarget(observation, this.panorama?.isPrimaryDisplay !== false, destinationRef);
-      const targetSystem = target?.kind === 'star' ? target.starId : target?.systemId;
+      const targetSystem = target?.kind === 'star' ? target.starId
+        : target?.kind === 'landmark' ? 'c0' : target?.systemId;
+      const landmarkIndex = target?.kind === 'landmark'
+        ? this.universe.landmarks.findIndex((entry) => entry.def.id === target.landmarkId) : -1;
       const body = targetSystem === this.universe.current.starId
-        ? target?.kind === 'star' ? this.universe.current.star : target ? this.universe.get(target.bodyId) : null
+        ? target?.kind === 'star' ? this.universe.current.star
+          : target?.kind === 'body' ? this.universe.get(target.bodyId) : null
         : null;
-      const placement = body ? (() => {
-        const projected = new Vector3().subVectors(body.position, camPos).project(eng.camera);
-        const radius = this.bodies.byId.get(body.id)?.apparentRadiusPx
-          ?? Math.atan2(body.radius, body.position.distanceTo(camPos)) * pxPerRad;
+      const placement = body || landmarkIndex >= 0 ? (() => {
+        const landmark = landmarkIndex >= 0 ? this.universe.landmarks[landmarkIndex] : null;
+        const relative = landmark ? this.universe.landmarkRelative(landmarkIndex, camPos)
+          : new Vector3().subVectors(body!.position, camPos);
+        const projected = relative.project(eng.camera);
+        const radius = landmark ? this.landmarkSprites.angularRadius(landmarkIndex) * pxPerRad
+          : this.bodies.byId.get(body!.id)?.apparentRadiusPx
+            ?? Math.atan2(body!.radius, body!.position.distanceTo(camPos)) * pxPerRad;
         return reachInfoPlacement(projected.x, projected.y, radius,
           eng.width, eng.height, this.reachInfoSide);
       })() : null;
       if (placement) this.reachInfoSide = placement.side;
       this.ui.updateReachInfo(body ?? null, target?.kind === 'star' && body ? target.starId : null,
-        placement, reachInfoOpacity(observation));
+        placement, reachInfoOpacity(observation), landmarkIndex >= 0 ? landmarkIndex : null);
     }
     if (this.arrivalTrace && this.universe.current.starId === 'c64548') {
       const view = this.bodies.byId.get(star.id);
