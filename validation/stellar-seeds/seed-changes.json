@@ -1,0 +1,2912 @@
+{
+  "authored": [
+    {
+      "id": "l-etacar",
+      "name": "Eta Carinae",
+      "oldSeed": 253,
+      "newSeed": 2395
+    },
+    {
+      "id": "l-r136a1",
+      "name": "R136a1",
+      "oldSeed": 253,
+      "newSeed": 7025
+    },
+    {
+      "id": "l-wohg64",
+      "name": "WOH G64",
+      "oldSeed": 253,
+      "newSeed": 6261
+    },
+    {
+      "id": "l-m31v1",
+      "name": "Hubble'ın V1 Sefeidi",
+      "oldSeed": 222,
+      "newSeed": 5604
+    },
+    {
+      "id": "l-j1748-comp",
+      "name": "PSR J1748-2446ad yoldaşı",
+      "oldSeed": 377,
+      "newSeed": 6264
+    },
+    {
+      "id": "l-j0437-wd",
+      "name": "PSR J0437-4715 B (beyaz cüce)",
+      "oldSeed": 315,
+      "newSeed": 7862
+    },
+    {
+      "id": "s2",
+      "name": "S2",
+      "oldSeed": 67,
+      "newSeed": 9605
+    },
+    {
+      "id": "s38",
+      "name": "S38",
+      "oldSeed": 98,
+      "newSeed": 15110
+    },
+    {
+      "id": "s55",
+      "name": "S55 (S0-102)",
+      "oldSeed": 98,
+      "newSeed": 9549
+    },
+    {
+      "id": "gaiabh1-star",
+      "name": "Gaia BH1 (yoldaş yıldız)",
+      "oldSeed": 377,
+      "newSeed": 16783
+    },
+    {
+      "id": "v404-star",
+      "name": "V404 Cygni (yoldaş yıldız)",
+      "oldSeed": 284,
+      "newSeed": 6089
+    },
+    {
+      "id": "a0620-star",
+      "name": "V616 Monocerotis (yoldaş yıldız)",
+      "oldSeed": 315,
+      "newSeed": 1533
+    },
+    {
+      "id": "lmcx1-star",
+      "name": "LMC X-1 yoldaşı (O7 III)",
+      "oldSeed": 315,
+      "newSeed": 10093
+    },
+    {
+      "id": "lmcx3-star",
+      "name": "LMC X-3 yoldaşı (B3 V)",
+      "oldSeed": 315,
+      "newSeed": 4508
+    },
+    {
+      "id": "m33x7-star",
+      "name": "M33 X-7 yoldaşı (O7-8 III)",
+      "oldSeed": 315,
+      "newSeed": 5773
+    }
+  ],
+  "catalogProper": [
+    {
+      "id": "s627-star",
+      "name": "Alpheratz",
+      "oldSeed": 630,
+      "newSeed": 5249
+    },
+    {
+      "id": "s691-star",
+      "name": "Caph",
+      "oldSeed": 694,
+      "newSeed": 1253
+    },
+    {
+      "id": "s989-star",
+      "name": "Algenib",
+      "oldSeed": 992,
+      "newSeed": 6875
+    },
+    {
+      "id": "s1366-star",
+      "name": "Groombridge 34",
+      "oldSeed": 372,
+      "newSeed": 1731
+    },
+    {
+      "id": "s1432-star",
+      "name": "Citadelle",
+      "oldSeed": 438,
+      "newSeed": 15982
+    },
+    {
+      "id": "s1920-star",
+      "name": "Ankaa",
+      "oldSeed": 926,
+      "newSeed": 15170
+    },
+    {
+      "id": "s2071-star",
+      "name": "Felixvarela",
+      "oldSeed": 80,
+      "newSeed": 1328
+    },
+    {
+      "id": "s2682-star",
+      "name": "Fulu",
+      "oldSeed": 691,
+      "newSeed": 9177
+    },
+    {
+      "id": "s2920-star",
+      "name": "Schedar",
+      "oldSeed": 929,
+      "newSeed": 8219
+    },
+    {
+      "id": "s3140-star",
+      "name": "Diphda",
+      "oldSeed": 152,
+      "newSeed": 8685
+    },
+    {
+      "id": "s3197-star",
+      "name": "Cocibolca",
+      "oldSeed": 209,
+      "newSeed": 1998
+    },
+    {
+      "id": "s3462-star",
+      "name": "96 G. Psc",
+      "oldSeed": 474,
+      "newSeed": 15863
+    },
+    {
+      "id": "s3512-star",
+      "name": "Achird",
+      "oldSeed": 524,
+      "newSeed": 3464
+    },
+    {
+      "id": "s3518-star",
+      "name": "Van Maanen's Star",
+      "oldSeed": 530,
+      "newSeed": 16186
+    },
+    {
+      "id": "s4065-star",
+      "name": "Castula",
+      "oldSeed": 80,
+      "newSeed": 3139
+    },
+    {
+      "id": "s4070-star",
+      "name": "Cih",
+      "oldSeed": 85,
+      "newSeed": 3402
+    },
+    {
+      "id": "s4644-star",
+      "name": "Nenque",
+      "oldSeed": 659,
+      "newSeed": 13324
+    },
+    {
+      "id": "s4919-star",
+      "name": "Wurren",
+      "oldSeed": 934,
+      "newSeed": 3788
+    },
+    {
+      "id": "s5012-star",
+      "name": "Mirach",
+      "oldSeed": 30,
+      "newSeed": 6069
+    },
+    {
+      "id": "s5093-star",
+      "name": "Emiw",
+      "oldSeed": 111,
+      "newSeed": 11886
+    },
+    {
+      "id": "s5286-star",
+      "name": "Revati",
+      "oldSeed": 304,
+      "newSeed": 9974
+    },
+    {
+      "id": "s5292-star",
+      "name": "Revati B",
+      "oldSeed": 310,
+      "newSeed": 12623
+    },
+    {
+      "id": "s5908-star",
+      "name": "Adhil",
+      "oldSeed": 926,
+      "newSeed": 16922
+    },
+    {
+      "id": "s6119-star",
+      "name": "Bélénos",
+      "oldSeed": 140,
+      "newSeed": 17224
+    },
+    {
+      "id": "s6161-star",
+      "name": "Ruchbah",
+      "oldSeed": 182,
+      "newSeed": 3646
+    },
+    {
+      "id": "s6533-star",
+      "name": "Alpherg",
+      "oldSeed": 554,
+      "newSeed": 9048
+    },
+    {
+      "id": "s6923-star",
+      "name": "Titawin",
+      "oldSeed": 944,
+      "newSeed": 16665
+    },
+    {
+      "id": "s6990-star",
+      "name": "Achernar",
+      "oldSeed": 14,
+      "newSeed": 6077
+    },
+    {
+      "id": "s7008-star",
+      "name": "Nembus",
+      "oldSeed": 32,
+      "newSeed": 7037
+    },
+    {
+      "id": "s7139-star",
+      "name": "p Eridani",
+      "oldSeed": 163,
+      "newSeed": 12150
+    },
+    {
+      "id": "s7549-star",
+      "name": "Torcular",
+      "oldSeed": 573,
+      "newSeed": 7224
+    },
+    {
+      "id": "s7954-star",
+      "name": "Baten Kaitos",
+      "oldSeed": 978,
+      "newSeed": 6587
+    },
+    {
+      "id": "s8091-star",
+      "name": "Mothallah",
+      "oldSeed": 118,
+      "newSeed": 2582
+    },
+    {
+      "id": "s8125-star",
+      "name": "Mesarthim",
+      "oldSeed": 152,
+      "newSeed": 12180
+    },
+    {
+      "id": "s8176-star",
+      "name": "Segin",
+      "oldSeed": 203,
+      "newSeed": 3225
+    },
+    {
+      "id": "s8191-star",
+      "name": "Sheratan",
+      "oldSeed": 218,
+      "newSeed": 4149
+    },
+    {
+      "id": "s8732-star",
+      "name": "Alrescha",
+      "oldSeed": 759,
+      "newSeed": 4636
+    },
+    {
+      "id": "s8876-star",
+      "name": "Almach",
+      "oldSeed": 903,
+      "newSeed": 1185
+    },
+    {
+      "id": "s9103-star",
+      "name": "Hamal",
+      "oldSeed": 133,
+      "newSeed": 6300
+    },
+    {
+      "id": "s9945-star",
+      "name": "Mira",
+      "oldSeed": 975,
+      "newSeed": 17368
+    },
+    {
+      "id": "s10818-star",
+      "name": "Polaris",
+      "oldSeed": 851,
+      "newSeed": 4805
+    },
+    {
+      "id": "s11138-star",
+      "name": "268 G. Cet",
+      "oldSeed": 174,
+      "newSeed": 11805
+    },
+    {
+      "id": "s11212-star",
+      "name": "Buna",
+      "oldSeed": 248,
+      "newSeed": 7990
+    },
+    {
+      "id": "s11674-star",
+      "name": "Kaffaljidhma",
+      "oldSeed": 710,
+      "newSeed": 2577
+    },
+    {
+      "id": "s11909-star",
+      "name": "Koeia",
+      "oldSeed": 945,
+      "newSeed": 2263
+    },
+    {
+      "id": "s12002-star",
+      "name": "Lilii Borea",
+      "oldSeed": 41,
+      "newSeed": 16745
+    },
+    {
+      "id": "s12123-star",
+      "name": "Nushagak",
+      "oldSeed": 162,
+      "newSeed": 12285
+    },
+    {
+      "id": "s12137-star",
+      "name": "Bharani",
+      "oldSeed": 176,
+      "newSeed": 8492
+    },
+    {
+      "id": "s12190-star",
+      "name": "Miram",
+      "oldSeed": 229,
+      "newSeed": 4386
+    },
+    {
+      "id": "s12209-star",
+      "name": "Angetenar",
+      "oldSeed": 248,
+      "newSeed": 15763
+    },
+    {
+      "id": "s12590-star",
+      "name": "Azha",
+      "oldSeed": 629,
+      "newSeed": 5274
+    },
+    {
+      "id": "s12726-star",
+      "name": "Acamar",
+      "oldSeed": 765,
+      "newSeed": 15242
+    },
+    {
+      "id": "s12865-star",
+      "name": "Ayeyarwady",
+      "oldSeed": 904,
+      "newSeed": 13853
+    },
+    {
+      "id": "s12993-star",
+      "name": "Menkar",
+      "oldSeed": 35,
+      "newSeed": 11003
+    },
+    {
+      "id": "s13409-star",
+      "name": "Algol",
+      "oldSeed": 451,
+      "newSeed": 13040
+    },
+    {
+      "id": "s13498-star",
+      "name": "Misam",
+      "oldSeed": 540,
+      "newSeed": 8146
+    },
+    {
+      "id": "s13660-star",
+      "name": "Botein",
+      "oldSeed": 702,
+      "newSeed": 5865
+    },
+    {
+      "id": "s13699-star",
+      "name": "Dalim",
+      "oldSeed": 741,
+      "newSeed": 10985
+    },
+    {
+      "id": "s13995-star",
+      "name": "Zibal",
+      "oldSeed": 40,
+      "newSeed": 15523
+    },
+    {
+      "id": "s14293-star",
+      "name": "82 G. Eri",
+      "oldSeed": 338,
+      "newSeed": 16350
+    },
+    {
+      "id": "s14359-star",
+      "name": "Intan",
+      "oldSeed": 404,
+      "newSeed": 12607
+    },
+    {
+      "id": "s14624-star",
+      "name": "Mirfak",
+      "oldSeed": 669,
+      "newSeed": 14307
+    },
+    {
+      "id": "s15247-star",
+      "name": "Ran",
+      "oldSeed": 295,
+      "newSeed": 9724
+    },
+    {
+      "id": "s15767-star",
+      "name": "Tupi",
+      "oldSeed": 815,
+      "newSeed": 16209
+    },
+    {
+      "id": "s16025-star",
+      "name": "Rana",
+      "oldSeed": 76,
+      "newSeed": 8128
+    },
+    {
+      "id": "s16091-star",
+      "name": "Atik",
+      "oldSeed": 142,
+      "newSeed": 7322
+    },
+    {
+      "id": "s16131-star",
+      "name": "Celaeno",
+      "oldSeed": 182,
+      "newSeed": 10468
+    },
+    {
+      "id": "s16141-star",
+      "name": "Electra",
+      "oldSeed": 192,
+      "newSeed": 7185
+    },
+    {
+      "id": "s16170-star",
+      "name": "Taygeta",
+      "oldSeed": 221,
+      "newSeed": 6604
+    },
+    {
+      "id": "s16210-star",
+      "name": "Maia",
+      "oldSeed": 261,
+      "newSeed": 7386
+    },
+    {
+      "id": "s16215-star",
+      "name": "Asterope",
+      "oldSeed": 266,
+      "newSeed": 3430
+    },
+    {
+      "id": "s16244-star",
+      "name": "Merope",
+      "oldSeed": 295,
+      "newSeed": 12421
+    },
+    {
+      "id": "s16334-star",
+      "name": "Alcyone",
+      "oldSeed": 385,
+      "newSeed": 15092
+    },
+    {
+      "id": "s16472-star",
+      "name": "Atlas",
+      "oldSeed": 523,
+      "newSeed": 7706
+    },
+    {
+      "id": "s16476-star",
+      "name": "Pleione",
+      "oldSeed": 527,
+      "newSeed": 3217
+    },
+    {
+      "id": "s17120-star",
+      "name": "Zaurak",
+      "oldSeed": 174,
+      "newSeed": 3011
+    },
+    {
+      "id": "s17182-star",
+      "name": "Menkib",
+      "oldSeed": 236,
+      "newSeed": 2548
+    },
+    {
+      "id": "s18089-star",
+      "name": "Beid",
+      "oldSeed": 146,
+      "newSeed": 1510
+    },
+    {
+      "id": "s18328-star",
+      "name": "Keid",
+      "oldSeed": 385,
+      "newSeed": 1875
+    },
+    {
+      "id": "s18655-star",
+      "name": "Prima Hyadum",
+      "oldSeed": 712,
+      "newSeed": 1809
+    },
+    {
+      "id": "s18891-star",
+      "name": "Secunda Hyadum",
+      "oldSeed": 948,
+      "newSeed": 12016
+    },
+    {
+      "id": "s18960-star",
+      "name": "Beemim",
+      "oldSeed": 20,
+      "newSeed": 4013
+    },
+    {
+      "id": "s19292-star",
+      "name": "Ain",
+      "oldSeed": 352,
+      "newSeed": 8458
+    },
+    {
+      "id": "s19297-star",
+      "name": "Chamukuy",
+      "oldSeed": 357,
+      "newSeed": 10993
+    },
+    {
+      "id": "s19498-star",
+      "name": "Hoggar",
+      "oldSeed": 558,
+      "newSeed": 11275
+    },
+    {
+      "id": "s19768-star",
+      "name": "Theemin",
+      "oldSeed": 828,
+      "newSeed": 9390
+    },
+    {
+      "id": "s19796-star",
+      "name": "Aldebaran",
+      "oldSeed": 856,
+      "newSeed": 11777
+    },
+    {
+      "id": "s19961-star",
+      "name": "Sceptrum",
+      "oldSeed": 24,
+      "newSeed": 17208
+    },
+    {
+      "id": "s20757-star",
+      "name": "Tabit",
+      "oldSeed": 820,
+      "newSeed": 10311
+    },
+    {
+      "id": "s20796-star",
+      "name": "Mouhoun",
+      "oldSeed": 859,
+      "newSeed": 16597
+    },
+    {
+      "id": "s21273-star",
+      "name": "Hassaleh",
+      "oldSeed": 339,
+      "newSeed": 1645
+    },
+    {
+      "id": "s21645-star",
+      "name": "Almaaz",
+      "oldSeed": 711,
+      "newSeed": 5923
+    },
+    {
+      "id": "s21681-star",
+      "name": "Saclateni",
+      "oldSeed": 747,
+      "newSeed": 8408
+    },
+    {
+      "id": "s21974-star",
+      "name": "Haedus",
+      "oldSeed": 43,
+      "newSeed": 5739
+    },
+    {
+      "id": "s22075-star",
+      "name": "Cursa",
+      "oldSeed": 144,
+      "newSeed": 1329
+    },
+    {
+      "id": "s22193-star",
+      "name": "Mago",
+      "oldSeed": 262,
+      "newSeed": 5846
+    },
+    {
+      "id": "s22352-star",
+      "name": "Kapteyn's Star",
+      "oldSeed": 421,
+      "newSeed": 3863
+    },
+    {
+      "id": "s22577-star",
+      "name": "Rigel",
+      "oldSeed": 646,
+      "newSeed": 16830
+    },
+    {
+      "id": "s22737-star",
+      "name": "Capella",
+      "oldSeed": 806,
+      "newSeed": 14022
+    },
+    {
+      "id": "s23405-star",
+      "name": "Bellatrix",
+      "oldSeed": 477,
+      "newSeed": 8042
+    },
+    {
+      "id": "s23489-star",
+      "name": "Elnath",
+      "oldSeed": 561,
+      "newSeed": 10563
+    },
+    {
+      "id": "s23651-star",
+      "name": "Nihal",
+      "oldSeed": 723,
+      "newSeed": 8367
+    },
+    {
+      "id": "s23946-star",
+      "name": "Mintaka",
+      "oldSeed": 21,
+      "newSeed": 15079
+    },
+    {
+      "id": "s23996-star",
+      "name": "Arneb",
+      "oldSeed": 71,
+      "newSeed": 4022
+    },
+    {
+      "id": "s24201-star",
+      "name": "Meissa",
+      "oldSeed": 276,
+      "newSeed": 1196
+    },
+    {
+      "id": "s24227-star",
+      "name": "Hatysa",
+      "oldSeed": 302,
+      "newSeed": 6276
+    },
+    {
+      "id": "s24289-star",
+      "name": "Alnilam",
+      "oldSeed": 364,
+      "newSeed": 2626
+    },
+    {
+      "id": "s24352-star",
+      "name": "Bubup",
+      "oldSeed": 427,
+      "newSeed": 6060
+    },
+    {
+      "id": "s24417-star",
+      "name": "Tianguan",
+      "oldSeed": 492,
+      "newSeed": 17358
+    },
+    {
+      "id": "s24590-star",
+      "name": "Phact",
+      "oldSeed": 665,
+      "newSeed": 13228
+    },
+    {
+      "id": "s24673-star",
+      "name": "Alnitak",
+      "oldSeed": 748,
+      "newSeed": 14963
+    },
+    {
+      "id": "s25263-star",
+      "name": "Saiph",
+      "oldSeed": 341,
+      "newSeed": 15934
+    },
+    {
+      "id": "s25495-star",
+      "name": "Wazn",
+      "oldSeed": 573,
+      "newSeed": 15273
+    },
+    {
+      "id": "s25822-star",
+      "name": "Betelgeuse",
+      "oldSeed": 900,
+      "newSeed": 900
+    },
+    {
+      "id": "s26159-star",
+      "name": "Menkalinan",
+      "oldSeed": 240,
+      "newSeed": 3141
+    },
+    {
+      "id": "s26177-star",
+      "name": "Mahasim",
+      "oldSeed": 258,
+      "newSeed": 13255
+    },
+    {
+      "id": "s26776-star",
+      "name": "Elkurud",
+      "oldSeed": 857,
+      "newSeed": 7392
+    },
+    {
+      "id": "s27249-star",
+      "name": "Amadioha",
+      "oldSeed": 333,
+      "newSeed": 6312
+    },
+    {
+      "id": "s27345-star",
+      "name": "Propus",
+      "oldSeed": 429,
+      "newSeed": 14357
+    },
+    {
+      "id": "s27752-star",
+      "name": "Red Rectangle",
+      "oldSeed": 836,
+      "newSeed": 16173
+    },
+    {
+      "id": "s27785-star",
+      "name": "Furud",
+      "oldSeed": 869,
+      "newSeed": 10716
+    },
+    {
+      "id": "s27970-star",
+      "name": "Mirzam",
+      "oldSeed": 57,
+      "newSeed": 15449
+    },
+    {
+      "id": "s27988-star",
+      "name": "Tejat",
+      "oldSeed": 75,
+      "newSeed": 10607
+    },
+    {
+      "id": "s28075-star",
+      "name": "Canopus",
+      "oldSeed": 162,
+      "newSeed": 13017
+    },
+    {
+      "id": "s28446-star",
+      "name": "Lucilinburhuc",
+      "oldSeed": 533,
+      "newSeed": 11019
+    },
+    {
+      "id": "s28488-star",
+      "name": "Lusitânia",
+      "oldSeed": 575,
+      "newSeed": 2242
+    },
+    {
+      "id": "s28500-star",
+      "name": "Ross 614",
+      "oldSeed": 587,
+      "newSeed": 14343
+    },
+    {
+      "id": "s29181-star",
+      "name": "Alhena",
+      "oldSeed": 271,
+      "newSeed": 13380
+    },
+    {
+      "id": "s29371-star",
+      "name": "Nosaxa",
+      "oldSeed": 461,
+      "newSeed": 9301
+    },
+    {
+      "id": "s29691-star",
+      "name": "Mebsuta",
+      "oldSeed": 781,
+      "newSeed": 12372
+    },
+    {
+      "id": "s29786-star",
+      "name": "Sirius",
+      "oldSeed": 876,
+      "newSeed": 7653
+    },
+    {
+      "id": "s29797-star",
+      "name": "Alzirr",
+      "oldSeed": 887,
+      "newSeed": 8157
+    },
+    {
+      "id": "s30300-star",
+      "name": "Nervia",
+      "oldSeed": 393,
+      "newSeed": 17009
+    },
+    {
+      "id": "s30862-star",
+      "name": "Adhara",
+      "oldSeed": 955,
+      "newSeed": 14600
+    },
+    {
+      "id": "s30991-star",
+      "name": "Citalá",
+      "oldSeed": 87,
+      "newSeed": 3749
+    },
+    {
+      "id": "s31117-star",
+      "name": "Nganurganity",
+      "oldSeed": 213,
+      "newSeed": 2370
+    },
+    {
+      "id": "s31285-star",
+      "name": "Muliphein",
+      "oldSeed": 381,
+      "newSeed": 8431
+    },
+    {
+      "id": "s31323-star",
+      "name": "Mekbuda",
+      "oldSeed": 419,
+      "newSeed": 15357
+    },
+    {
+      "id": "s31626-star",
+      "name": "Wezen",
+      "oldSeed": 722,
+      "newSeed": 8142
+    },
+    {
+      "id": "s32584-star",
+      "name": "Wasat",
+      "oldSeed": 683,
+      "newSeed": 11402
+    },
+    {
+      "id": "s32896-star",
+      "name": "Aludra",
+      "oldSeed": 995,
+      "newSeed": 12074
+    },
+    {
+      "id": "s33138-star",
+      "name": "Gomeisa",
+      "oldSeed": 240,
+      "newSeed": 17394
+    },
+    {
+      "id": "s33153-star",
+      "name": "Luyten's Star",
+      "oldSeed": 255,
+      "newSeed": 7899
+    },
+    {
+      "id": "s33720-star",
+      "name": "Castor",
+      "oldSeed": 822,
+      "newSeed": 10513
+    },
+    {
+      "id": "s34099-star",
+      "name": "Jishui",
+      "oldSeed": 204,
+      "newSeed": 3837
+    },
+    {
+      "id": "s34111-star",
+      "name": "Procyon",
+      "oldSeed": 216,
+      "newSeed": 16902
+    },
+    {
+      "id": "s34115-star",
+      "name": "Ceibo",
+      "oldSeed": 220,
+      "newSeed": 12533
+    },
+    {
+      "id": "s34585-star",
+      "name": "Pollux",
+      "oldSeed": 690,
+      "newSeed": 15362
+    },
+    {
+      "id": "s34771-star",
+      "name": "Tapecue",
+      "oldSeed": 876,
+      "newSeed": 4368
+    },
+    {
+      "id": "s34889-star",
+      "name": "Azmidi",
+      "oldSeed": 994,
+      "newSeed": 14705
+    },
+    {
+      "id": "s36005-star",
+      "name": "Naos",
+      "oldSeed": 116,
+      "newSeed": 11978
+    },
+    {
+      "id": "s36298-star",
+      "name": "Tureis",
+      "oldSeed": 409,
+      "newSeed": 1192
+    },
+    {
+      "id": "s36665-star",
+      "name": "Tegmine",
+      "oldSeed": 776,
+      "newSeed": 13085
+    },
+    {
+      "id": "s36985-star",
+      "name": "Tarf",
+      "oldSeed": 99,
+      "newSeed": 2051
+    },
+    {
+      "id": "s37141-star",
+      "name": "Násti",
+      "oldSeed": 255,
+      "newSeed": 9714
+    },
+    {
+      "id": "s37322-star",
+      "name": "Piautos",
+      "oldSeed": 436,
+      "newSeed": 4633
+    },
+    {
+      "id": "s37465-star",
+      "name": "Avior",
+      "oldSeed": 579,
+      "newSeed": 15584
+    },
+    {
+      "id": "s37501-star",
+      "name": "Alsciaukat",
+      "oldSeed": 615,
+      "newSeed": 2312
+    },
+    {
+      "id": "s38067-star",
+      "name": "Muscida",
+      "oldSeed": 184,
+      "newSeed": 10639
+    },
+    {
+      "id": "s38707-star",
+      "name": "Minchir",
+      "oldSeed": 824,
+      "newSeed": 10256
+    },
+    {
+      "id": "s38748-star",
+      "name": "Gakyid",
+      "oldSeed": 865,
+      "newSeed": 3385
+    },
+    {
+      "id": "s38848-star",
+      "name": "Meleph",
+      "oldSeed": 965,
+      "newSeed": 10954
+    },
+    {
+      "id": "s39075-star",
+      "name": "Asellus Borealis",
+      "oldSeed": 195,
+      "newSeed": 11667
+    },
+    {
+      "id": "s39170-star",
+      "name": "Asellus Australis",
+      "oldSeed": 290,
+      "newSeed": 11150
+    },
+    {
+      "id": "s39172-star",
+      "name": "Alsephina",
+      "oldSeed": 292,
+      "newSeed": 15951
+    },
+    {
+      "id": "s39349-star",
+      "name": "Ashlesha",
+      "oldSeed": 469,
+      "newSeed": 15395
+    },
+    {
+      "id": "s39777-star",
+      "name": "Copernicus",
+      "oldSeed": 897,
+      "newSeed": 8038
+    },
+    {
+      "id": "s39854-star",
+      "name": "Stribor",
+      "oldSeed": 974,
+      "newSeed": 8670
+    },
+    {
+      "id": "s40208-star",
+      "name": "Acubens",
+      "oldSeed": 331,
+      "newSeed": 8289
+    },
+    {
+      "id": "s40263-star",
+      "name": "Talitha",
+      "oldSeed": 386,
+      "newSeed": 8717
+    },
+    {
+      "id": "s40391-star",
+      "name": "Ross 687",
+      "oldSeed": 514,
+      "newSeed": 11129
+    },
+    {
+      "id": "s40585-star",
+      "name": "Alkaphrah",
+      "oldSeed": 708,
+      "newSeed": 9074
+    },
+    {
+      "id": "s40904-star",
+      "name": "Suhail",
+      "oldSeed": 30,
+      "newSeed": 5242
+    },
+    {
+      "id": "s41025-star",
+      "name": "Nahn",
+      "oldSeed": 151,
+      "newSeed": 3361
+    },
+    {
+      "id": "s41287-star",
+      "name": "Miaplacidus",
+      "oldSeed": 413,
+      "newSeed": 15971
+    },
+    {
+      "id": "s41572-star",
+      "name": "Aspidiske",
+      "oldSeed": 698,
+      "newSeed": 14822
+    },
+    {
+      "id": "s41917-star",
+      "name": "Markeb",
+      "oldSeed": 46,
+      "newSeed": 16277
+    },
+    {
+      "id": "s42328-star",
+      "name": "Alphard",
+      "oldSeed": 457,
+      "newSeed": 16702
+    },
+    {
+      "id": "s42401-star",
+      "name": "Intercrus",
+      "oldSeed": 530,
+      "newSeed": 10806
+    },
+    {
+      "id": "s42654-star",
+      "name": "Alterf",
+      "oldSeed": 783,
+      "newSeed": 16767
+    },
+    {
+      "id": "s42966-star",
+      "name": "Illyrian",
+      "oldSeed": 98,
+      "newSeed": 12640
+    },
+    {
+      "id": "s43075-star",
+      "name": "Kalausi",
+      "oldSeed": 207,
+      "newSeed": 14663
+    },
+    {
+      "id": "s43288-star",
+      "name": "Ukdah",
+      "oldSeed": 420,
+      "newSeed": 11259
+    },
+    {
+      "id": "s43359-star",
+      "name": "Subra",
+      "oldSeed": 491,
+      "newSeed": 16664
+    },
+    {
+      "id": "s43602-star",
+      "name": "Añañuca",
+      "oldSeed": 734,
+      "newSeed": 8036
+    },
+    {
+      "id": "s43719-star",
+      "name": "Ras Elased Australis",
+      "oldSeed": 851,
+      "newSeed": 5917
+    },
+    {
+      "id": "s44022-star",
+      "name": "Natasha",
+      "oldSeed": 157,
+      "newSeed": 15424
+    },
+    {
+      "id": "s44132-star",
+      "name": "Zhang",
+      "oldSeed": 267,
+      "newSeed": 14128
+    },
+    {
+      "id": "s44219-star",
+      "name": "Rasalas",
+      "oldSeed": 354,
+      "newSeed": 6003
+    },
+    {
+      "id": "s44365-star",
+      "name": "Felis",
+      "oldSeed": 500,
+      "newSeed": 12624
+    },
+    {
+      "id": "s44449-star",
+      "name": "Bibhā",
+      "oldSeed": 584,
+      "newSeed": 5171
+    },
+    {
+      "id": "s45324-star",
+      "name": "Regulus",
+      "oldSeed": 462,
+      "newSeed": 11069
+    },
+    {
+      "id": "s45929-star",
+      "name": "Adhafera",
+      "oldSeed": 70,
+      "newSeed": 7886
+    },
+    {
+      "id": "s45961-star",
+      "name": "Tania Borealis",
+      "oldSeed": 102,
+      "newSeed": 16272
+    },
+    {
+      "id": "s46150-star",
+      "name": "Algieba",
+      "oldSeed": 291,
+      "newSeed": 11540
+    },
+    {
+      "id": "s46348-star",
+      "name": "Tania Australis",
+      "oldSeed": 489,
+      "newSeed": 8736
+    },
+    {
+      "id": "s47915-star",
+      "name": "Macondo",
+      "oldSeed": 62,
+      "newSeed": 2964
+    },
+    {
+      "id": "s48552-star",
+      "name": "Praecipua",
+      "oldSeed": 699,
+      "newSeed": 9230
+    },
+    {
+      "id": "s48814-star",
+      "name": "Aiolos",
+      "oldSeed": 961,
+      "newSeed": 3309
+    },
+    {
+      "id": "s48986-star",
+      "name": "Chalawan",
+      "oldSeed": 136,
+      "newSeed": 9602
+    },
+    {
+      "id": "s49000-star",
+      "name": "Alkes",
+      "oldSeed": 150,
+      "newSeed": 2651
+    },
+    {
+      "id": "s49159-star",
+      "name": "Merak",
+      "oldSeed": 309,
+      "newSeed": 1589
+    },
+    {
+      "id": "s49269-star",
+      "name": "Lalande 21185",
+      "oldSeed": 419,
+      "newSeed": 1249
+    },
+    {
+      "id": "s49293-star",
+      "name": "Dubhe",
+      "oldSeed": 443,
+      "newSeed": 5434
+    },
+    {
+      "id": "s49380-star",
+      "name": "Dingolay",
+      "oldSeed": 530,
+      "newSeed": 12629
+    },
+    {
+      "id": "s50029-star",
+      "name": "Zosma",
+      "oldSeed": 182,
+      "newSeed": 14283
+    },
+    {
+      "id": "s50035-star",
+      "name": "Chertan",
+      "oldSeed": 188,
+      "newSeed": 14285
+    },
+    {
+      "id": "s50300-star",
+      "name": "Hunahpú",
+      "oldSeed": 453,
+      "newSeed": 8435
+    },
+    {
+      "id": "s50341-star",
+      "name": "Alula Borealis",
+      "oldSeed": 494,
+      "newSeed": 15659
+    },
+    {
+      "id": "s50752-star",
+      "name": "Shama",
+      "oldSeed": 905,
+      "newSeed": 4320
+    },
+    {
+      "id": "s51241-star",
+      "name": "Giausar",
+      "oldSeed": 397,
+      "newSeed": 9558
+    },
+    {
+      "id": "s51508-star",
+      "name": "Formosa",
+      "oldSeed": 664,
+      "newSeed": 3933
+    },
+    {
+      "id": "s51564-star",
+      "name": "Sagarmatha",
+      "oldSeed": 720,
+      "newSeed": 7359
+    },
+    {
+      "id": "s52027-star",
+      "name": "Noquisi",
+      "oldSeed": 186,
+      "newSeed": 9567
+    },
+    {
+      "id": "s52206-star",
+      "name": "Uklun",
+      "oldSeed": 365,
+      "newSeed": 1688
+    },
+    {
+      "id": "s52278-star",
+      "name": "Flegetonte",
+      "oldSeed": 437,
+      "newSeed": 16070
+    },
+    {
+      "id": "s52305-star",
+      "name": "Taiyangshou",
+      "oldSeed": 464,
+      "newSeed": 4497
+    },
+    {
+      "id": "s52437-star",
+      "name": "Ross 128",
+      "oldSeed": 596,
+      "newSeed": 12826
+    },
+    {
+      "id": "s52516-star",
+      "name": "Denebola",
+      "oldSeed": 675,
+      "newSeed": 6123
+    },
+    {
+      "id": "s52623-star",
+      "name": "Zavijava",
+      "oldSeed": 782,
+      "newSeed": 11474
+    },
+    {
+      "id": "s52680-star",
+      "name": "Aniara",
+      "oldSeed": 839,
+      "newSeed": 12904
+    },
+    {
+      "id": "s52788-star",
+      "name": "Groombridge 1830",
+      "oldSeed": 947,
+      "newSeed": 2470
+    },
+    {
+      "id": "s52845-star",
+      "name": "Phecda",
+      "oldSeed": 7,
+      "newSeed": 6133
+    },
+    {
+      "id": "s53704-star",
+      "name": "Tonatiuh",
+      "oldSeed": 866,
+      "newSeed": 4100
+    },
+    {
+      "id": "s53922-star",
+      "name": "Alchiba",
+      "oldSeed": 87,
+      "newSeed": 9891
+    },
+    {
+      "id": "s54430-star",
+      "name": "Imai",
+      "oldSeed": 595,
+      "newSeed": 8378
+    },
+    {
+      "id": "s54456-star",
+      "name": "Megrez",
+      "oldSeed": 621,
+      "newSeed": 16645
+    },
+    {
+      "id": "s54482-star",
+      "name": "Gienah",
+      "oldSeed": 647,
+      "newSeed": 2668
+    },
+    {
+      "id": "s54781-star",
+      "name": "Zaniah",
+      "oldSeed": 946,
+      "newSeed": 9560
+    },
+    {
+      "id": "s54901-star",
+      "name": "Ginan",
+      "oldSeed": 69,
+      "newSeed": 15752
+    },
+    {
+      "id": "s55245-star",
+      "name": "Tupã",
+      "oldSeed": 413,
+      "newSeed": 8558
+    },
+    {
+      "id": "s55312-star",
+      "name": "Acrux",
+      "oldSeed": 480,
+      "newSeed": 10029
+    },
+    {
+      "id": "s55540-star",
+      "name": "Algorab",
+      "oldSeed": 708,
+      "newSeed": 16971
+    },
+    {
+      "id": "s55646-star",
+      "name": "Gacrux",
+      "oldSeed": 814,
+      "newSeed": 13509
+    },
+    {
+      "id": "s55731-star",
+      "name": "Funi",
+      "oldSeed": 899,
+      "newSeed": 9212
+    },
+    {
+      "id": "s55863-star",
+      "name": "Chara",
+      "oldSeed": 34,
+      "newSeed": 17131
+    },
+    {
+      "id": "s55905-star",
+      "name": "Kraz",
+      "oldSeed": 76,
+      "newSeed": 9670
+    },
+    {
+      "id": "s56440-star",
+      "name": "Porrima",
+      "oldSeed": 611,
+      "newSeed": 7965
+    },
+    {
+      "id": "s56702-star",
+      "name": "La Superba",
+      "oldSeed": 873,
+      "newSeed": 15627
+    },
+    {
+      "id": "s56876-star",
+      "name": "Tianyi",
+      "oldSeed": 50,
+      "newSeed": 6189
+    },
+    {
+      "id": "s56887-star",
+      "name": "Mimosa",
+      "oldSeed": 61,
+      "newSeed": 8065
+    },
+    {
+      "id": "s56902-star",
+      "name": "Gar",
+      "oldSeed": 76,
+      "newSeed": 5162
+    },
+    {
+      "id": "s57365-star",
+      "name": "Alioth",
+      "oldSeed": 539,
+      "newSeed": 13658
+    },
+    {
+      "id": "s57474-star",
+      "name": "Taiyi",
+      "oldSeed": 648,
+      "newSeed": 5603
+    },
+    {
+      "id": "s57487-star",
+      "name": "Minelauva",
+      "oldSeed": 661,
+      "newSeed": 1056
+    },
+    {
+      "id": "s57514-star",
+      "name": "Cor Caroli B",
+      "oldSeed": 688,
+      "newSeed": 11806
+    },
+    {
+      "id": "s57517-star",
+      "name": "Cor Caroli",
+      "oldSeed": 691,
+      "newSeed": 14033
+    },
+    {
+      "id": "s57948-star",
+      "name": "Vindemiatrix",
+      "oldSeed": 125,
+      "newSeed": 4500
+    },
+    {
+      "id": "s58534-star",
+      "name": "Diadem",
+      "oldSeed": 711,
+      "newSeed": 4095
+    },
+    {
+      "id": "s59579-star",
+      "name": "Mizar",
+      "oldSeed": 759,
+      "newSeed": 15361
+    },
+    {
+      "id": "s59626-star",
+      "name": "Matza",
+      "oldSeed": 806,
+      "newSeed": 3781
+    },
+    {
+      "id": "s59669-star",
+      "name": "Spica",
+      "oldSeed": 849,
+      "newSeed": 12771
+    },
+    {
+      "id": "s59671-star",
+      "name": "Alcor",
+      "oldSeed": 851,
+      "newSeed": 6171
+    },
+    {
+      "id": "s60175-star",
+      "name": "Dofida",
+      "oldSeed": 358,
+      "newSeed": 14992
+    },
+    {
+      "id": "s60306-star",
+      "name": "Liesma",
+      "oldSeed": 489,
+      "newSeed": 1258
+    },
+    {
+      "id": "s60359-star",
+      "name": "Heze",
+      "oldSeed": 542,
+      "newSeed": 3557
+    },
+    {
+      "id": "s61304-star",
+      "name": "Alkaid",
+      "oldSeed": 490,
+      "newSeed": 16200
+    },
+    {
+      "id": "s61862-star",
+      "name": "Muphrid",
+      "oldSeed": 51,
+      "newSeed": 11424
+    },
+    {
+      "id": "s62555-star",
+      "name": "Hadar",
+      "oldSeed": 744,
+      "newSeed": 8725
+    },
+    {
+      "id": "s62607-star",
+      "name": "Thuban",
+      "oldSeed": 796,
+      "newSeed": 13872
+    },
+    {
+      "id": "s62761-star",
+      "name": "Menkent",
+      "oldSeed": 950,
+      "newSeed": 14098
+    },
+    {
+      "id": "s63210-star",
+      "name": "Kang",
+      "oldSeed": 402,
+      "newSeed": 5103
+    },
+    {
+      "id": "s63436-star",
+      "name": "Arcturus",
+      "oldSeed": 628,
+      "newSeed": 3169
+    },
+    {
+      "id": "s63462-star",
+      "name": "Syrma",
+      "oldSeed": 654,
+      "newSeed": 14873
+    },
+    {
+      "id": "s63491-star",
+      "name": "Xuange",
+      "oldSeed": 683,
+      "newSeed": 10870
+    },
+    {
+      "id": "s63716-star",
+      "name": "Khambalia",
+      "oldSeed": 908,
+      "newSeed": 10299
+    },
+    {
+      "id": "s64426-star",
+      "name": "Elgafar",
+      "oldSeed": 621,
+      "newSeed": 10842
+    },
+    {
+      "id": "s64548-star",
+      "name": "Proxima Centauri",
+      "oldSeed": 743,
+      "newSeed": 15762
+    },
+    {
+      "id": "s64719-star",
+      "name": "Seginus",
+      "oldSeed": 914,
+      "newSeed": 3129
+    },
+    {
+      "id": "s65259-star",
+      "name": "Toliman",
+      "oldSeed": 457,
+      "newSeed": 457
+    },
+    {
+      "id": "s65262-star",
+      "name": "Rigil Kentaurus",
+      "oldSeed": 460,
+      "newSeed": 460
+    },
+    {
+      "id": "s65658-star",
+      "name": "Izar",
+      "oldSeed": 856,
+      "newSeed": 4683
+    },
+    {
+      "id": "s65873-star",
+      "name": "Mönch",
+      "oldSeed": 74,
+      "newSeed": 9090
+    },
+    {
+      "id": "s66011-star",
+      "name": "Merga",
+      "oldSeed": 212,
+      "newSeed": 2222
+    },
+    {
+      "id": "s66123-star",
+      "name": "Kochab",
+      "oldSeed": 324,
+      "newSeed": 11664
+    },
+    {
+      "id": "s66138-star",
+      "name": "Zubenelgenubi",
+      "oldSeed": 339,
+      "newSeed": 8661
+    },
+    {
+      "id": "s66351-star",
+      "name": "Arcalís",
+      "oldSeed": 552,
+      "newSeed": 14727
+    },
+    {
+      "id": "s66627-star",
+      "name": "Baekdu",
+      "oldSeed": 828,
+      "newSeed": 1572
+    },
+    {
+      "id": "s67008-star",
+      "name": "Nekkar",
+      "oldSeed": 212,
+      "newSeed": 4106
+    },
+    {
+      "id": "s67152-star",
+      "name": "Brachium",
+      "oldSeed": 356,
+      "newSeed": 6641
+    },
+    {
+      "id": "s68132-star",
+      "name": "Zubeneschamali",
+      "oldSeed": 339,
+      "newSeed": 17277
+    },
+    {
+      "id": "s68295-star",
+      "name": "Nikawiy",
+      "oldSeed": 502,
+      "newSeed": 4834
+    },
+    {
+      "id": "s68416-star",
+      "name": "Pherkad",
+      "oldSeed": 623,
+      "newSeed": 6781
+    },
+    {
+      "id": "s68708-star",
+      "name": "Alkalurops",
+      "oldSeed": 915,
+      "newSeed": 11028
+    },
+    {
+      "id": "s68713-star",
+      "name": "Alkalurops B",
+      "oldSeed": 920,
+      "newSeed": 6724
+    },
+    {
+      "id": "s68753-star",
+      "name": "Edasich",
+      "oldSeed": 960,
+      "newSeed": 14404
+    },
+    {
+      "id": "s68972-star",
+      "name": "Nusakan",
+      "oldSeed": 182,
+      "newSeed": 8151
+    },
+    {
+      "id": "s69488-star",
+      "name": "Alphecca",
+      "oldSeed": 698,
+      "newSeed": 17036
+    },
+    {
+      "id": "s69549-star",
+      "name": "Zubenelhakrabi",
+      "oldSeed": 759,
+      "newSeed": 10006
+    },
+    {
+      "id": "s69567-star",
+      "name": "Karaka",
+      "oldSeed": 777,
+      "newSeed": 6755
+    },
+    {
+      "id": "s70234-star",
+      "name": "Unukalhai",
+      "oldSeed": 447,
+      "newSeed": 2736
+    },
+    {
+      "id": "s70585-star",
+      "name": "Gudja",
+      "oldSeed": 798,
+      "newSeed": 4152
+    },
+    {
+      "id": "s71176-star",
+      "name": "Iklil",
+      "oldSeed": 392,
+      "newSeed": 10858
+    },
+    {
+      "id": "s71324-star",
+      "name": "Fang",
+      "oldSeed": 540,
+      "newSeed": 10896
+    },
+    {
+      "id": "s71449-star",
+      "name": "Dschubba",
+      "oldSeed": 665,
+      "newSeed": 4297
+    },
+    {
+      "id": "s71833-star",
+      "name": "Acrab",
+      "oldSeed": 52,
+      "newSeed": 1266
+    },
+    {
+      "id": "s71834-star",
+      "name": "Acrab B",
+      "oldSeed": 53,
+      "newSeed": 15347
+    },
+    {
+      "id": "s72040-star",
+      "name": "Marsic",
+      "oldSeed": 259,
+      "newSeed": 2750
+    },
+    {
+      "id": "s72041-star",
+      "name": "Marsic B",
+      "oldSeed": 260,
+      "newSeed": 3670
+    },
+    {
+      "id": "s72206-star",
+      "name": "Kamuy",
+      "oldSeed": 425,
+      "newSeed": 5081
+    },
+    {
+      "id": "s72350-star",
+      "name": "Jabbah",
+      "oldSeed": 569,
+      "newSeed": 12841
+    },
+    {
+      "id": "s72405-star",
+      "name": "Sharjah",
+      "oldSeed": 624,
+      "newSeed": 6256
+    },
+    {
+      "id": "s72548-star",
+      "name": "Yed Prior",
+      "oldSeed": 767,
+      "newSeed": 7263
+    },
+    {
+      "id": "s72820-star",
+      "name": "Yed Posterior",
+      "oldSeed": 42,
+      "newSeed": 15783
+    },
+    {
+      "id": "s73003-star",
+      "name": "Hunor",
+      "oldSeed": 225,
+      "newSeed": 4836
+    },
+    {
+      "id": "s73036-star",
+      "name": "Alniyat",
+      "oldSeed": 258,
+      "newSeed": 6469
+    },
+    {
+      "id": "s73243-star",
+      "name": "Athebyne",
+      "oldSeed": 465,
+      "newSeed": 7808
+    },
+    {
+      "id": "s73369-star",
+      "name": "Cujam",
+      "oldSeed": 591,
+      "newSeed": 15792
+    },
+    {
+      "id": "s73578-star",
+      "name": "Timir",
+      "oldSeed": 800,
+      "newSeed": 15359
+    },
+    {
+      "id": "s73646-star",
+      "name": "Antares",
+      "oldSeed": 868,
+      "newSeed": 2910
+    },
+    {
+      "id": "s73692-star",
+      "name": "Kornephoros",
+      "oldSeed": 914,
+      "newSeed": 17140
+    },
+    {
+      "id": "s73700-star",
+      "name": "Wolf 1061",
+      "oldSeed": 922,
+      "newSeed": 13132
+    },
+    {
+      "id": "s73712-star",
+      "name": "Ogma",
+      "oldSeed": 934,
+      "newSeed": 6429
+    },
+    {
+      "id": "s73753-star",
+      "name": "Marfik",
+      "oldSeed": 975,
+      "newSeed": 3234
+    },
+    {
+      "id": "s73886-star",
+      "name": "Rosalíadecastro",
+      "oldSeed": 111,
+      "newSeed": 10470
+    },
+    {
+      "id": "s74112-star",
+      "name": "Paikauhale",
+      "oldSeed": 337,
+      "newSeed": 13957
+    },
+    {
+      "id": "s75025-star",
+      "name": "Atria",
+      "oldSeed": 253,
+      "newSeed": 17374
+    },
+    {
+      "id": "s75138-star",
+      "name": "Larawag",
+      "oldSeed": 366,
+      "newSeed": 9349
+    },
+    {
+      "id": "s75247-star",
+      "name": "Xamidimura",
+      "oldSeed": 475,
+      "newSeed": 9879
+    },
+    {
+      "id": "s75275-star",
+      "name": "Pipirima",
+      "oldSeed": 503,
+      "newSeed": 8513
+    },
+    {
+      "id": "s75371-star",
+      "name": "Mahsati",
+      "oldSeed": 599,
+      "newSeed": 1835
+    },
+    {
+      "id": "s76188-star",
+      "name": "Rapeto",
+      "oldSeed": 419,
+      "newSeed": 5542
+    },
+    {
+      "id": "s76505-star",
+      "name": "Aldhibah",
+      "oldSeed": 736,
+      "newSeed": 1195
+    },
+    {
+      "id": "s76610-star",
+      "name": "Sabik",
+      "oldSeed": 841,
+      "newSeed": 15244
+    },
+    {
+      "id": "s76907-star",
+      "name": "Rasalgethi",
+      "oldSeed": 141,
+      "newSeed": 1735
+    },
+    {
+      "id": "s76938-star",
+      "name": "Sarin",
+      "oldSeed": 172,
+      "newSeed": 10889
+    },
+    {
+      "id": "s76961-star",
+      "name": "Guniibuu",
+      "oldSeed": 195,
+      "newSeed": 13394
+    },
+    {
+      "id": "s77313-star",
+      "name": "Inquill",
+      "oldSeed": 547,
+      "newSeed": 5667
+    },
+    {
+      "id": "s78117-star",
+      "name": "Rastaban",
+      "oldSeed": 354,
+      "newSeed": 12276
+    },
+    {
+      "id": "s78139-star",
+      "name": "Maasym",
+      "oldSeed": 376,
+      "newSeed": 11819
+    },
+    {
+      "id": "s78141-star",
+      "name": "Lesath",
+      "oldSeed": 378,
+      "newSeed": 4753
+    },
+    {
+      "id": "s78250-star",
+      "name": "Yildun",
+      "oldSeed": 487,
+      "newSeed": 2676
+    },
+    {
+      "id": "s78350-star",
+      "name": "Shaula",
+      "oldSeed": 587,
+      "newSeed": 10551
+    },
+    {
+      "id": "s78444-star",
+      "name": "Rasalhague",
+      "oldSeed": 681,
+      "newSeed": 6229
+    },
+    {
+      "id": "s78624-star",
+      "name": "Sargas",
+      "oldSeed": 861,
+      "newSeed": 3844
+    },
+    {
+      "id": "s78967-star",
+      "name": "Dziban",
+      "oldSeed": 207,
+      "newSeed": 1112
+    },
+    {
+      "id": "s78973-star",
+      "name": "Dziban B",
+      "oldSeed": 213,
+      "newSeed": 6327
+    },
+    {
+      "id": "s79088-star",
+      "name": "Cebalrai",
+      "oldSeed": 328,
+      "newSeed": 11273
+    },
+    {
+      "id": "s79124-star",
+      "name": "Alruba",
+      "oldSeed": 364,
+      "newSeed": 5532
+    },
+    {
+      "id": "s79138-star",
+      "name": "Cervantes",
+      "oldSeed": 378,
+      "newSeed": 4059
+    },
+    {
+      "id": "s79556-star",
+      "name": "Fuyue",
+      "oldSeed": 796,
+      "newSeed": 4956
+    },
+    {
+      "id": "s79846-star",
+      "name": "Grumium",
+      "oldSeed": 89,
+      "newSeed": 14206
+    },
+    {
+      "id": "s80060-star",
+      "name": "Eltanin",
+      "oldSeed": 303,
+      "newSeed": 12997
+    },
+    {
+      "id": "s80155-star",
+      "name": "Barnard's Star",
+      "oldSeed": 398,
+      "newSeed": 17119
+    },
+    {
+      "id": "s80576-star",
+      "name": "Pincoya",
+      "oldSeed": 819,
+      "newSeed": 11941
+    },
+    {
+      "id": "s80769-star",
+      "name": "Alnasl",
+      "oldSeed": 15,
+      "newSeed": 7493
+    },
+    {
+      "id": "s81938-star",
+      "name": "Kaus Media",
+      "oldSeed": 187,
+      "newSeed": 8776
+    },
+    {
+      "id": "s82009-star",
+      "name": "Alasia",
+      "oldSeed": 258,
+      "newSeed": 11802
+    },
+    {
+      "id": "s82174-star",
+      "name": "Kaus Australis",
+      "oldSeed": 423,
+      "newSeed": 16896
+    },
+    {
+      "id": "s82311-star",
+      "name": "Fafnir",
+      "oldSeed": 560,
+      "newSeed": 8908
+    },
+    {
+      "id": "s82449-star",
+      "name": "Kaus Borealis",
+      "oldSeed": 698,
+      "newSeed": 11862
+    },
+    {
+      "id": "s83130-star",
+      "name": "Vega",
+      "oldSeed": 382,
+      "newSeed": 6943
+    },
+    {
+      "id": "s83574-star",
+      "name": "Struve 2398 A",
+      "oldSeed": 826,
+      "newSeed": 10495
+    },
+    {
+      "id": "s83576-star",
+      "name": "Struve 2398 B",
+      "oldSeed": 828,
+      "newSeed": 5918
+    },
+    {
+      "id": "s83650-star",
+      "name": "Xihe",
+      "oldSeed": 902,
+      "newSeed": 7732
+    },
+    {
+      "id": "s84148-star",
+      "name": "Ross 154",
+      "oldSeed": 403,
+      "newSeed": 15640
+    },
+    {
+      "id": "s84163-star",
+      "name": "Sheliak",
+      "oldSeed": 418,
+      "newSeed": 11264
+    },
+    {
+      "id": "s84472-star",
+      "name": "Ainalrami",
+      "oldSeed": 727,
+      "newSeed": 13039
+    },
+    {
+      "id": "s84558-star",
+      "name": "Nunki",
+      "oldSeed": 813,
+      "newSeed": 6034
+    },
+    {
+      "id": "s84596-star",
+      "name": "Kaveh",
+      "oldSeed": 851,
+      "newSeed": 6543
+    },
+    {
+      "id": "s84645-star",
+      "name": "Alya",
+      "oldSeed": 900,
+      "newSeed": 17126
+    },
+    {
+      "id": "s84649-star",
+      "name": "Alya B",
+      "oldSeed": 904,
+      "newSeed": 6569
+    },
+    {
+      "id": "s84871-star",
+      "name": "Sulafat",
+      "oldSeed": 129,
+      "newSeed": 6057
+    },
+    {
+      "id": "s85163-star",
+      "name": "Ascella",
+      "oldSeed": 421,
+      "newSeed": 16467
+    },
+    {
+      "id": "s85383-star",
+      "name": "Okab",
+      "oldSeed": 641,
+      "newSeed": 14385
+    },
+    {
+      "id": "s85705-star",
+      "name": "Meridiana",
+      "oldSeed": 963,
+      "newSeed": 9328
+    },
+    {
+      "id": "s85729-star",
+      "name": "Albaldah",
+      "oldSeed": 987,
+      "newSeed": 5625
+    },
+    {
+      "id": "s85940-star",
+      "name": "Altais",
+      "oldSeed": 201,
+      "newSeed": 16574
+    },
+    {
+      "id": "s86034-star",
+      "name": "Aladfar",
+      "oldSeed": 295,
+      "newSeed": 15618
+    },
+    {
+      "id": "s86183-star",
+      "name": "Gumala",
+      "oldSeed": 444,
+      "newSeed": 6144
+    },
+    {
+      "id": "s86627-star",
+      "name": "Belel",
+      "oldSeed": 888,
+      "newSeed": 15448
+    },
+    {
+      "id": "s86731-star",
+      "name": "Arkab Prior",
+      "oldSeed": 992,
+      "newSeed": 5125
+    },
+    {
+      "id": "s86751-star",
+      "name": "Sika",
+      "oldSeed": 15,
+      "newSeed": 8452
+    },
+    {
+      "id": "s86782-star",
+      "name": "Arkab Posterior",
+      "oldSeed": 46,
+      "newSeed": 12348
+    },
+    {
+      "id": "s86831-star",
+      "name": "Rukbat",
+      "oldSeed": 95,
+      "newSeed": 16907
+    },
+    {
+      "id": "s87208-star",
+      "name": "Anser",
+      "oldSeed": 472,
+      "newSeed": 8742
+    },
+    {
+      "id": "s87357-star",
+      "name": "Albireo",
+      "oldSeed": 621,
+      "newSeed": 13943
+    },
+    {
+      "id": "s87360-star",
+      "name": "Albireo B",
+      "oldSeed": 624,
+      "newSeed": 8787
+    },
+    {
+      "id": "s87478-star",
+      "name": "Uruk",
+      "oldSeed": 742,
+      "newSeed": 6200
+    },
+    {
+      "id": "s87498-star",
+      "name": "Alsafi",
+      "oldSeed": 762,
+      "newSeed": 1498
+    },
+    {
+      "id": "s88091-star",
+      "name": "Sham",
+      "oldSeed": 358,
+      "newSeed": 5165
+    },
+    {
+      "id": "s88446-star",
+      "name": "Fawaris",
+      "oldSeed": 713,
+      "newSeed": 8782
+    },
+    {
+      "id": "s88544-star",
+      "name": "Tarazed",
+      "oldSeed": 811,
+      "newSeed": 6492
+    },
+    {
+      "id": "s88878-star",
+      "name": "Altair",
+      "oldSeed": 148,
+      "newSeed": 8764
+    },
+    {
+      "id": "s89137-star",
+      "name": "Libertas",
+      "oldSeed": 407,
+      "newSeed": 8611
+    },
+    {
+      "id": "s89229-star",
+      "name": "Alshain",
+      "oldSeed": 499,
+      "newSeed": 12922
+    },
+    {
+      "id": "s89256-star",
+      "name": "Terebellum",
+      "oldSeed": 526,
+      "newSeed": 13351
+    },
+    {
+      "id": "s89466-star",
+      "name": "Cygnus X-1",
+      "oldSeed": 736,
+      "newSeed": 12192
+    },
+    {
+      "id": "s90879-star",
+      "name": "Chechia",
+      "oldSeed": 155,
+      "newSeed": 15399
+    },
+    {
+      "id": "s91033-star",
+      "name": "Algedi",
+      "oldSeed": 309,
+      "newSeed": 10999
+    },
+    {
+      "id": "s91244-star",
+      "name": "Alshat",
+      "oldSeed": 520,
+      "newSeed": 9103
+    },
+    {
+      "id": "s91278-star",
+      "name": "Dabih",
+      "oldSeed": 554,
+      "newSeed": 3519
+    },
+    {
+      "id": "s91374-star",
+      "name": "Sadr",
+      "oldSeed": 650,
+      "newSeed": 1137
+    },
+    {
+      "id": "s91639-star",
+      "name": "Peacock",
+      "oldSeed": 915,
+      "newSeed": 3200
+    },
+    {
+      "id": "s92244-star",
+      "name": "Aldulfin",
+      "oldSeed": 523,
+      "newSeed": 15558
+    },
+    {
+      "id": "s92561-star",
+      "name": "Rotanev",
+      "oldSeed": 840,
+      "newSeed": 7063
+    },
+    {
+      "id": "s92736-star",
+      "name": "Sualocin",
+      "oldSeed": 18,
+      "newSeed": 4807
+    },
+    {
+      "id": "s92866-star",
+      "name": "Deneb",
+      "oldSeed": 148,
+      "newSeed": 15518
+    },
+    {
+      "id": "s93225-star",
+      "name": "Aljanah",
+      "oldSeed": 507,
+      "newSeed": 3336
+    },
+    {
+      "id": "s93339-star",
+      "name": "Albali",
+      "oldSeed": 621,
+      "newSeed": 16948
+    },
+    {
+      "id": "s94174-star",
+      "name": "Musica",
+      "oldSeed": 459,
+      "newSeed": 13288
+    },
+    {
+      "id": "s94980-star",
+      "name": "Polaris Australis",
+      "oldSeed": 268,
+      "newSeed": 3297
+    },
+    {
+      "id": "s95341-star",
+      "name": "Solaris",
+      "oldSeed": 629,
+      "newSeed": 9447
+    },
+    {
+      "id": "s95530-star",
+      "name": "Kitalpha",
+      "oldSeed": 818,
+      "newSeed": 8369
+    },
+    {
+      "id": "s95623-star",
+      "name": "Lacaille 8760",
+      "oldSeed": 911,
+      "newSeed": 1944
+    },
+    {
+      "id": "s95727-star",
+      "name": "Alderamin",
+      "oldSeed": 18,
+      "newSeed": 9495
+    },
+    {
+      "id": "s96484-star",
+      "name": "Alfirk",
+      "oldSeed": 775,
+      "newSeed": 11539
+    },
+    {
+      "id": "s96708-star",
+      "name": "Sadalsuud",
+      "oldSeed": 999,
+      "newSeed": 5427
+    },
+    {
+      "id": "s97167-star",
+      "name": "Bunda",
+      "oldSeed": 461,
+      "newSeed": 13905
+    },
+    {
+      "id": "s97200-star",
+      "name": "Sāmaya",
+      "oldSeed": 494,
+      "newSeed": 4822
+    },
+    {
+      "id": "s97343-star",
+      "name": "Nashira",
+      "oldSeed": 637,
+      "newSeed": 15115
+    },
+    {
+      "id": "s97485-star",
+      "name": "Azelfafage",
+      "oldSeed": 779,
+      "newSeed": 6143
+    },
+    {
+      "id": "s97585-star",
+      "name": "Bosona",
+      "oldSeed": 879,
+      "newSeed": 11035
+    },
+    {
+      "id": "s97643-star",
+      "name": "Enif",
+      "oldSeed": 937,
+      "newSeed": 10747
+    },
+    {
+      "id": "s97862-star",
+      "name": "Deneb Algedi",
+      "oldSeed": 159,
+      "newSeed": 7353
+    },
+    {
+      "id": "s98346-star",
+      "name": "Aldhanab",
+      "oldSeed": 643,
+      "newSeed": 11358
+    },
+    {
+      "id": "s98612-star",
+      "name": "Itonda",
+      "oldSeed": 909,
+      "newSeed": 13110
+    },
+    {
+      "id": "s99117-star",
+      "name": "Kurhah",
+      "oldSeed": 417,
+      "newSeed": 7230
+    },
+    {
+      "id": "s99259-star",
+      "name": "Sadalmelik",
+      "oldSeed": 559,
+      "newSeed": 7864
+    },
+    {
+      "id": "s99433-star",
+      "name": "Alnair",
+      "oldSeed": 733,
+      "newSeed": 10109
+    },
+    {
+      "id": "s99581-star",
+      "name": "Biham",
+      "oldSeed": 881,
+      "newSeed": 11683
+    },
+    {
+      "id": "s100117-star",
+      "name": "Ancha",
+      "oldSeed": 420,
+      "newSeed": 12131
+    },
+    {
+      "id": "s100481-star",
+      "name": "Sadachbia",
+      "oldSeed": 784,
+      "newSeed": 7562
+    },
+    {
+      "id": "s100873-star",
+      "name": "Lionrock",
+      "oldSeed": 179,
+      "newSeed": 5455
+    },
+    {
+      "id": "s100944-star",
+      "name": "Kruger 60",
+      "oldSeed": 250,
+      "newSeed": 6247
+    },
+    {
+      "id": "s101676-star",
+      "name": "Situla",
+      "oldSeed": 982,
+      "newSeed": 14327
+    },
+    {
+      "id": "s101973-star",
+      "name": "Homam",
+      "oldSeed": 282,
+      "newSeed": 4613
+    },
+    {
+      "id": "s102060-star",
+      "name": "Tiaki",
+      "oldSeed": 369,
+      "newSeed": 4770
+    },
+    {
+      "id": "s102094-star",
+      "name": "Matar",
+      "oldSeed": 403,
+      "newSeed": 3803
+    },
+    {
+      "id": "s102622-star",
+      "name": "Sadalbari",
+      "oldSeed": 931,
+      "newSeed": 3876
+    },
+    {
+      "id": "s102968-star",
+      "name": "Skat",
+      "oldSeed": 280,
+      "newSeed": 9913
+    },
+    {
+      "id": "s103172-star",
+      "name": "Helvetios",
+      "oldSeed": 484,
+      "newSeed": 11739
+    },
+    {
+      "id": "s103183-star",
+      "name": "Fomalhaut",
+      "oldSeed": 495,
+      "newSeed": 10609
+    },
+    {
+      "id": "s103663-star",
+      "name": "Scheat",
+      "oldSeed": 975,
+      "newSeed": 8125
+    },
+    {
+      "id": "s103671-star",
+      "name": "Fumalsamakah",
+      "oldSeed": 983,
+      "newSeed": 2296
+    },
+    {
+      "id": "s103739-star",
+      "name": "Markab",
+      "oldSeed": 54,
+      "newSeed": 15159
+    },
+    {
+      "id": "s103818-star",
+      "name": "Lacaille 9352",
+      "oldSeed": 133,
+      "newSeed": 11147
+    },
+    {
+      "id": "s104066-star",
+      "name": "Ebla",
+      "oldSeed": 381,
+      "newSeed": 5557
+    },
+    {
+      "id": "s104882-star",
+      "name": "Danfeng",
+      "oldSeed": 200,
+      "newSeed": 1865
+    },
+    {
+      "id": "s104916-star",
+      "name": "Salm",
+      "oldSeed": 234,
+      "newSeed": 15723
+    },
+    {
+      "id": "s105255-star",
+      "name": "Alkarab",
+      "oldSeed": 573,
+      "newSeed": 7246
+    },
+    {
+      "id": "s105675-star",
+      "name": "Veritate",
+      "oldSeed": 993,
+      "newSeed": 14185
+    },
+    {
+      "id": "s105682-star",
+      "name": "Poerava",
+      "oldSeed": 3,
+      "newSeed": 1275
+    },
+    {
+      "id": "s106269-star",
+      "name": "Errai",
+      "oldSeed": 590,
+      "newSeed": 5481
+    },
+    {
+      "id": "s107332-star",
+      "name": "Uúba",
+      "oldSeed": 656,
+      "newSeed": 6934
+    },
+    {
+      "id": "s107733-star",
+      "name": "Axólotl",
+      "oldSeed": 60,
+      "newSeed": 12433
+    },
+    {
+      "id": "s107866-star",
+      "name": "p Eridani",
+      "oldSeed": 193,
+      "newSeed": 10089
+    },
+    {
+      "id": "s108265-star",
+      "name": "Castor B",
+      "oldSeed": 592,
+      "newSeed": 12932
+    },
+    {
+      "id": "s108295-star",
+      "name": "Kaewkosin",
+      "oldSeed": 622,
+      "newSeed": 10152
+    },
+    {
+      "id": "s108307-star",
+      "name": "Maru",
+      "oldSeed": 634,
+      "newSeed": 5450
+    },
+    {
+      "id": "s108369-star",
+      "name": "Ross 686",
+      "oldSeed": 696,
+      "newSeed": 4123
+    },
+    {
+      "id": "s108500-star",
+      "name": "Wolf 359",
+      "oldSeed": 827,
+      "newSeed": 11842
+    },
+    {
+      "id": "s108522-star",
+      "name": "Alula Australis",
+      "oldSeed": 849,
+      "newSeed": 9969
+    },
+    {
+      "id": "s108523-star",
+      "name": "Alula Australis B",
+      "oldSeed": 850,
+      "newSeed": 9440
+    },
+    {
+      "id": "s108838-star",
+      "name": "Graffias",
+      "oldSeed": 168,
+      "newSeed": 12113
+    },
+    {
+      "id": "s108907-star",
+      "name": "Alrakis",
+      "oldSeed": 237,
+      "newSeed": 13355
+    },
+    {
+      "id": "s108915-star",
+      "name": "Guniibuu B",
+      "oldSeed": 245,
+      "newSeed": 7919
+    },
+    {
+      "id": "s108917-star",
+      "name": "Onkaria",
+      "oldSeed": 247,
+      "newSeed": 11622
+    },
+    {
+      "id": "s109298-star",
+      "name": "EZ Aqr",
+      "oldSeed": 628,
+      "newSeed": 5533
+    },
+    {
+      "id": "s109365-star",
+      "name": "Ross 248",
+      "oldSeed": 695,
+      "newSeed": 1964
+    }
+  ],
+  "pulsars": [
+    {
+      "id": "l-crabpsr",
+      "name": "Yengeç Pulsarı (PSR B0531+21)",
+      "oldSeed": 156,
+      "newSeed": 5855
+    },
+    {
+      "id": "l-vela",
+      "name": "Vela Pulsarı (PSR B0833-45)",
+      "oldSeed": 105,
+      "newSeed": 10693
+    },
+    {
+      "id": "l-b1919",
+      "name": "PSR B1919+21 (LGM-1)",
+      "oldSeed": 122,
+      "newSeed": 10737
+    },
+    {
+      "id": "l-lich",
+      "name": "PSR B1257+12 (Lich)",
+      "oldSeed": 105,
+      "newSeed": 4375
+    },
+    {
+      "id": "l-j1748",
+      "name": "PSR J1748-2446ad",
+      "oldSeed": 122,
+      "newSeed": 13319
+    },
+    {
+      "id": "l-hulsetaylor",
+      "name": "Hulse–Taylor Çifti (PSR B1913+16)",
+      "oldSeed": 224,
+      "newSeed": 4003
+    },
+    {
+      "id": "l-geminga",
+      "name": "Geminga (PSR J0633+1746)",
+      "oldSeed": 156,
+      "newSeed": 6087
+    },
+    {
+      "id": "l-j0437",
+      "name": "PSR J0437-4715",
+      "oldSeed": 122,
+      "newSeed": 10997
+    },
+    {
+      "id": "l-sgr1806",
+      "name": "SGR 1806−20 (Magnetar)",
+      "oldSeed": 156,
+      "newSeed": 11329
+    }
+  ]
+}

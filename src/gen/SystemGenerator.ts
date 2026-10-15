@@ -3,6 +3,7 @@ import { fmtDistance, fmtLightYears } from '../ui/format';
 import type { StarInfo } from '../data/StarCatalog';
 import type { Appearance, Atmosphere, BodyData, Clouds, Rings, SimpleElements } from '../data/types';
 import { LUM_CLASS_DESC } from '../astro/stellar';
+import { stellarSurfaceSeed } from './StellarSeed';
 import { _, fixed, localeTag } from '../i18n';
 
 /* ------------------------------------------------------------------ */
@@ -115,7 +116,10 @@ export function generateSystem(star: StarInfo): GeneratedSystem {
     mass: star.massKg,
     rotationPeriod: rotHours,
     pole: { ra: rng.range(0, 360), dec: rng.range(-90, 90) },
-    appearance: { kind: 'star', temperature: star.temperature, seed: star.index % 997 + 3 },
+    appearance: { kind: 'star', temperature: star.temperature,
+      // Retain the accepted Betelgeuse convection and Alpha Centauri preview surfaces.
+      seed: star.names?.proper && ![25822, 65262, 65259].includes(star.index)
+        ? stellarSurfaceSeed(starId) : star.index % 997 + 3 },
     temperature: star.temperature,
     description: starDescription(star),
     facts: starFacts(star),

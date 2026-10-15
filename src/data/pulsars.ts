@@ -5,6 +5,7 @@ import type { StarInfo } from './StarCatalog';
 import type { BodyData, PoleRaDec } from './types';
 import type { LandmarkDef } from './landmarks';
 import { decimalYearJd, semiMajorKm, starBody, syntheticInfo } from './blackholes';
+import { stellarSurfaceSeed } from '../gen/StellarSeed';
 
 /**
  * Real pulsars (rotating neutron stars). Each one is a deep-sky landmark of kind `pulsar`
@@ -50,7 +51,7 @@ function pulsarBody(def: LandmarkDef): BodyData {
     mass: p.massSolar * SUN_MASS_KG,
     rotationPeriod: p.periodMs / 3.6e6,
     pole: p.pole,
-    appearance: { kind: 'pulsar', seed: (def.id.length * 17) % 991 + 3, magneticTilt: p.magneticTilt, beamHalfAngle: p.beamHalfAngle, beamLength: p.beamLength, beamColor: p.beamColor },
+    appearance: { kind: 'pulsar', seed: stellarSurfaceSeed(def.id), magneticTilt: p.magneticTilt, beamHalfAngle: p.beamHalfAngle, beamLength: p.beamLength, beamColor: p.beamColor },
     temperature: p.temperature,
     description: def.description,
     facts: def.facts,

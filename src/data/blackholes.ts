@@ -5,6 +5,7 @@ import { raDecToEclipticMath, raDecToScene } from '../math/frames';
 import { _, fixed, fmtNum } from '../i18n';
 import type { StarInfo } from './StarCatalog';
 import type { BodyData, PoleRaDec, SimpleElements } from './types';
+import { stellarSurfaceSeed } from '../gen/StellarSeed';
 
 /** Schwarzschild radius (km) for a mass in solar masses */
 export function schwarzschildKm(massSolar: number): number {
@@ -96,7 +97,7 @@ export function starBody(id: string, name: string, massSolar: number, radiusSola
     mass: massSolar * SUN_MASS_KG,
     rotationPeriod: 400,
     pole: { ra: 120, dec: 40 },
-    appearance: { kind: 'star', temperature, seed: (id.length * 31) % 997 + 5 },
+    appearance: { kind: 'star', temperature, seed: stellarSurfaceSeed(id) },
     temperature,
     description,
     facts,
