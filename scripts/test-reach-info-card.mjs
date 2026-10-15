@@ -73,4 +73,28 @@ assert.match(css, /body\.reach-mode #info \.info-actions \{ display: none !impor
 assert.match(css, /body\.reach-mode #info \.info-head-btns,/);
 assert.match(css, /body\.reach-mode #info \{[\s\S]*?max-height: none; overflow-y: visible;/);
 
-console.log('PASS Reach card position, phase fade, identity, monitor isolation, and explorer controls');
+const ui = readFileSync('src/ui/UI.ts', 'utf8');
+const cardLabels = [
+  'Kameraya uzaklık', 'Güneş\'e uzaklık', 'Model uzaklığı (Güneş\'ten)',
+  'Katalog uzaklığı (Dünya\'dan)', 'Görünür kadir (kameradan)',
+  'Görünür kadir (Dünya\'dan)', 'Katalog görünür kadir (Dünya\'dan)',
+  'Mutlak kadir', 'Açısal yarıçap (kameradan)', 'Görsel model yarıçapı',
+  'Fiziksel çap (katalog)', 'Fiziksel boyut (katalog)', 'Model çapı',
+  'Işık yolculuğu (buradan)', 'Işık yolculuğu (Dünya\'dan)',
+  'Fotoğraf: {source}. Üç boyutlu bulut görsel bir modeldir.',
+];
+for (const label of cardLabels) {
+  assert.ok(ui.includes(label.replaceAll("'", "\\'")), `card uses ${label}`);
+  for (const lang of ['en', 'de', 'es', 'fr']) {
+    const dict = JSON.parse(readFileSync(`src/i18n/locales/${lang}/ui.json`, 'utf8'));
+    assert.ok(dict[label], `${lang} translates ${label}`);
+  }
+}
+assert.doesNotMatch(ui, /rows\.push\(\['Işık gecikmesi(?: \(Dünya\))?'/);
+assert.match(ui, /if \(k === 'Uzaklık'\) rows\.push\(\['Katalog uzaklığı/);
+assert.match(ui, /if \(k === 'Görünür kadir'\) rows\.push\(\['Katalog görünür kadir/);
+const landmarks = readFileSync('src/data/landmarks.ts', 'utf8');
+assert.match(landmarks, /id: 'l-30dor'[\s\S]*?facts: \{ 'Uzaklık': '49,6 kpc \(LMC\)'/);
+assert.match(ui, /const photo = LANDMARK_IMAGES\[d\.id\]/);
+
+console.log('PASS Reach card position, labels, translations, provenance, and explorer controls');

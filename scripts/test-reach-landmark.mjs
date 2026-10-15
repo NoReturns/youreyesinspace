@@ -105,6 +105,12 @@ function verifyResume(run, state, label) {
 const run = makeRun();
 const landmark = run.universe.landmark('l-30dor');
 assert.ok(landmark && landmark.systemId === null);
+assert.equal(landmark.def.facts.Uzaklık, '49,6 kpc (LMC)', 'catalog distance stays intact');
+const modelDistancePc = landmark.positionPc.length();
+assert.ok(modelDistancePc > 50_000 && modelDistancePc < 51_000,
+  'LMC disc intersection retains its independent model distance');
+assert.ok(Math.abs(modelDistancePc - 49_600) > 1_000,
+  'the catalog and model distances remain distinct values');
 const fromEarth = run.universe.landmarkRelative(run.universe.landmarks.indexOf(landmark),
   run.universe.get('earth').position);
 assert.ok(fromEarth.distanceTo(landmark.positionPc.clone().multiplyScalar(PARSEC_KM)

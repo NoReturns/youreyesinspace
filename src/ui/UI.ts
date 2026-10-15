@@ -13,6 +13,7 @@ import type { StarPoints } from '../render/StarPoints';
 import type { GalaxySprites } from '../render/GalaxySprites';
 import type { LandmarkSprites } from '../render/LandmarkSprites';
 import { LANDMARK_KIND_LABEL } from '../data/landmarks';
+import { LANDMARK_IMAGES } from '../data/landmarkImages';
 import { starCardMetadata } from '../data/StarCatalog';
 import { AU_KM, LIGHT_YEAR_KM, PARSEC_KM, RAD } from '../core/constants';
 import { SUN_MASS_KG } from '../astro/stellar';
@@ -625,18 +626,18 @@ export class UI {
     const absMag = g.absMag[i];
     const lum = Math.pow(10, (4.83 - absMag) / 2.5);
     const rows: Array<[string, string] | 'sep'> = [];
-    rows.push(['Uzaklık', `${fmtLightYears(camDist)} (${fmtDistance(camDist)})`]);
-    rows.push(['Kadir (buradan)', fixed(this.host.galaxySprites.apparentMag(i), 1)]);
-    rows.push(['Görünür yarıçap', fmtDeg(this.host.galaxySprites.apparent(i).angRad * RAD, 2)]);
+    rows.push(['Kameraya uzaklık', fmtDistance(camDist)]);
+    rows.push(['Görünür kadir (kameradan)', fixed(this.host.galaxySprites.apparentMag(i), 1)]);
+    rows.push(['Açısal yarıçap (kameradan)', fmtDeg(this.host.galaxySprites.apparent(i).angRad * RAD, 2)]);
     rows.push('sep');
     rows.push(['Güneş\'e uzaklık', `${fmtLightYears(distSunKm)} (${fixed((g.distancePc(i) / 1e6), 3)} Mpc)`]);
     rows.push(['Hubble tipi', _(GALAXY_TYPE_LABEL[type])]);
-    rows.push(['Çap', `${fixed(((R * 2) / 1000), 1)} kpc (${fmtLightYears(R * 2 * PARSEC_KM)})`]);
+    rows.push(['Model çapı', `${fixed(((R * 2) / 1000), 1)} kpc (${fmtLightYears(R * 2 * PARSEC_KM)})`]);
     rows.push(['Mutlak kadir', fixed(absMag, 1)]);
     rows.push(['Parlaklık', `${lum.toExponential(2)} L☉`]);
     rows.push(['Yıldız sayısı (tahmini)', `~${(lum * 3).toExponential(1).replace('e+', '×10^')}`]);
     if (i < g.catalogCount && i !== 0) rows.push(['Kaynak', 'Messier / NGC (yaklaşık parametreler)']);
-    rows.push(['Işık gecikmesi', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = g.model(i).p.description ?? '';
   }
@@ -651,20 +652,27 @@ export class UI {
     const rel = u.landmarkRelative(i, this.host.camera.position);
     const camDist = rel.length();
     const rows: Array<[string, string] | 'sep'> = [];
-    rows.push(['Uzaklık', `${fmtLightYears(camDist)} (${fmtDistance(camDist)})`]);
-    rows.push(['Görünür yarıçap', fmtDeg(this.host.landmarkSprites.angularRadius(i) * RAD, 2)]);
+    rows.push(['Kameraya uzaklık', fmtDistance(camDist)]);
+    rows.push(['Açısal yarıçap (kameradan)', fmtDeg(this.host.landmarkSprites.angularRadius(i) * RAD, 2)]);
     const appMag = d.absMag + 5 * Math.log10(Math.max(camDist / PARSEC_KM, 1e-7)) - 5;
-    rows.push(['Kadir (buradan)', fixed(appMag, 1)]);
+    rows.push(['Görünür kadir (kameradan)', fixed(appMag, 1)]);
     rows.push('sep');
-    rows.push(['Güneş\'e uzaklık', fmtLightYears(l.positionPc.length() * PARSEC_KM)]);
-    rows.push(['Yarıçap (görsel)', fmtLightYears(d.radiusPc * PARSEC_KM)]);
+    rows.push([d.distancePc === undefined ? 'Model uzaklığı (Güneş\'ten)' : 'Güneş\'e uzaklık', fmtLightYears(l.positionPc.length() * PARSEC_KM)]);
+    rows.push(['Görsel model yarıçapı', fmtLightYears(d.radiusPc * PARSEC_KM)]);
     rows.push(['Mutlak kadir', fixed(d.absMag, 1)]);
     rows.push('sep');
-    for (const [k, v] of Object.entries(d.facts)) rows.push([k, v]);
-    rows.push(['Işık gecikmesi', fmtDuration(camDist / 299_792.458)]);
+    for (const [k, v] of Object.entries(d.facts)) {
+      if (k === 'Uzaklık') rows.push(['Katalog uzaklığı (Dünya\'dan)', v]);
+      else if (k === 'Görünür kadir') rows.push(['Katalog görünür kadir (Dünya\'dan)', v]);
+      else if (k === 'Çap' || k === 'Boyut') rows.push([k === 'Çap' ? 'Fiziksel çap (katalog)' : 'Fiziksel boyut (katalog)', v]);
+      else rows.push([k, v]);
+    }
+    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
-    this.infoDesc.textContent = document.body.classList.contains('reach-mode') ? d.description
-      : `${d.description} ${_('(Görsel: gerçek konum ve boyutta prosedürel bir temsil; fotoğraf değildir.)')}`;
+    const photo = LANDMARK_IMAGES[d.id];
+    this.infoDesc.textContent = `${d.description} ${photo
+      ? _('Fotoğraf: {source}. Üç boyutlu bulut görsel bir modeldir.', { source: photo.source })
+      : _('Görsel: prosedürel model; fotoğraf değildir.')}`;
   }
 
   private renderStarInfo(id: StarId): void {
@@ -683,13 +691,13 @@ export class UI {
     const rel = u.starRelative(id, this.host.camera.position);
     const camDist = rel.length();
     const rows: Array<[string, string] | 'sep'> = [];
-    rows.push(['Uzaklık', fmtDistance(camDist)]);
+    rows.push(['Kameraya uzaklık', fmtDistance(camDist)]);
     const appMag = this.host.starApparentMag(id) ?? (s.absMag + 5 * Math.log10(Math.max(camDist / PARSEC_KM, 1e-7)) - 5);
-    rows.push(['Kadir (buradan)', fixed(appMag, 2)]);
+    rows.push(['Görünür kadir (kameradan)', fixed(appMag, 2)]);
     rows.push('sep');
     rows.push(['Güneş\'e uzaklık', isProc ? fmtLightYears(s.distancePc * PARSEC_KM) : `${fixed((s.distancePc * PARSEC_KM / LIGHT_YEAR_KM), 2)} ly (${fixed(s.distancePc, 2)} pc)`]);
     rows.push(['Spektral sınıf', card.spectral]);
-    if (!isProc) rows.push(['Kadir (Dünya\'dan)', fixed(s.mag, 2)]);
+    if (!isProc) rows.push(['Görünür kadir (Dünya\'dan)', fixed(s.mag, 2)]);
     rows.push(['Mutlak kadir', fixed(s.absMag, 2)]);
     rows.push(['B−V renk', fixed(s.bv, 2)]);
     rows.push('sep');
@@ -706,7 +714,7 @@ export class UI {
     const moons = sys.bodies.filter((b) => b.data.type === 'moon').length;
     rows.push(['Gezegenler', planets ? `${planets}${moons ? ` ${_('(+{n} uydu)', { n: moons })}` : ''}` : 'Yok']);
     if (sys.belts.length) rows.push(['Kuşaklar', sys.belts.map((b) => _(b.name)).join(', ')]);
-    rows.push(['Işık gecikmesi', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
 
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = isProc
@@ -788,7 +796,7 @@ export class UI {
     }
     if (b.parent && camDist > 0) {
       const lightTime = camDist / 299_792.458;
-      rows.push(['Işık gecikmesi', fmtDuration(lightTime)]);
+      rows.push(['Işık yolculuğu (buradan)', fmtDuration(lightTime)]);
     }
 
     this.infoBody.innerHTML = rowsHtml(rows);
@@ -814,7 +822,7 @@ export class UI {
       for (const c of comps) rows.push([_("{name}'ın yörünge yarıçapı", { name: c.name }), c.resolved!.a > AU_KM * 0.05 ? `${fixed(c.resolved!.a / AU_KM, 3)} AU` : fmtDistance(c.resolved!.a)]);
       rows.push(['Dış merkezlik', fixed(first.resolved.e, 3)]);
     }
-    rows.push(['Işık gecikmesi', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = _('Çift sistemin ortak kütle merkezi: iki bileşen de bu görünmez noktanın etrafında, kütleleriyle ters orantılı yarıçaplarda ve her zaman karşılıklı konumlarda dolanır. Ağır bileşen küçük, hafif bileşen büyük bir yörünge çizer.');
   }
@@ -853,7 +861,7 @@ export class UI {
       rows.push('sep');
     }
     if (b.data.facts) for (const [k, v] of Object.entries(b.data.facts)) if (k !== 'Kütle') rows.push([k, v]);
-    rows.push(['Işık gecikmesi', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = `${_(b.data.description ?? '')} ${_('Görüntü: Schwarzschild metriğinde ışık yollarının (null jeodezikler) ekran uzayında gerçek zamanlı izlenmesi; diskte Doppler ışıması ve kütleçekimsel kırmızıya kayma uygulanır.')}`;
   }
@@ -894,7 +902,7 @@ export class UI {
       rows.push('sep');
     }
     if (b.data.facts) for (const [k, v] of Object.entries(b.data.facts)) if (k !== 'Kütle' && k !== 'Periyot') rows.push([k, v]);
-    rows.push(['Işık gecikmesi', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = `${_(b.data.description ?? '')} ${_('Görüntü: dönme ekseninden eğik manyetik eksen boyunca iki ışın konisi; koni her dönüşte bakış doğrultusunu süpürdüğünde parlaklık atar (deniz feneri etkisi). Işın geometrisi temsilîdir.')}`;
   }
@@ -939,7 +947,7 @@ export class UI {
     if (earth && b !== earth) {
       const dEarth = b.position.distanceTo(earth.position);
       rows.push(['Dünya\'ya uzaklık', au(dEarth)]);
-      rows.push(['Işık gecikmesi (Dünya)', fmtDuration(dEarth / 299_792.458)]);
+      rows.push(['Işık yolculuğu (Dünya\'dan)', fmtDuration(dEarth / 299_792.458)]);
     }
     if (o?.kind === 'linear') {
       rows.push([_('Hız ({name} referansı)', { name: star.name }), `${fixed(b.orbitalSpeed, 2)} km/s (${fixed((b.orbitalSpeed * 3600), 0)} ${_('km/sa')})`]);
