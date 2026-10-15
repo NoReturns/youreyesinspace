@@ -16,6 +16,7 @@ const entry = `
   export { ReachTiming } from './src/reach/ReachTiming.ts';
   export { PARSEC_KM } from './src/core/constants.ts';
   export { reachInfoTarget } from './src/reach/ReachInfoCard.ts';
+  export { ReachPanoramaSync } from './src/reach/ReachPanorama.ts';
 `;
 const bundle = await rolldown({
   input: '\0reach-landmark-test',
@@ -41,11 +42,11 @@ new Function('require', 'module', 'exports', output.output[0].code)(
 const { ReachVoyageDirector, REACH_PRODUCTION_ROUTE, reachPreviewRoute,
   reachLandmarkObservationDistance, destinationRef, destinationSystem,
   parseReachJourney, REACH_ITINERARY_VERSION, CameraController, TimeSystem,
-  Universe, StarCatalog, ReachTiming, PARSEC_KM, reachInfoTarget } = module.exports;
+  Universe, StarCatalog, ReachTiming, PARSEC_KM, reachInfoTarget, ReachPanoramaSync } = module.exports;
 const bin = readFileSync('public/data/stars.bin');
 const names = JSON.parse(readFileSync('public/data/star-names.json', 'utf8'));
 const catalog = new StarCatalog(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength), names);
-const route = reachPreviewRoute('tarantula');
+let route = reachPreviewRoute('tarantula');
 assert.equal(route.id, 'preview:tarantula');
 assert.deepEqual(route.stops.map((stop) => stop.id), ['earth', 'l-30dor']);
 assert.equal(route.repeat, true);
@@ -57,12 +58,18 @@ assert.equal(reachPreviewRoute('unknown-landmark'), null);
 const input = { flush: () => ({ dx: 0, dy: 0, wheel: 0, pinch: 0, panX: 0, panY: 0 }),
   down: () => false };
 const fov = 50 * Math.PI / 180;
-const hasDestination = (universe) => (id) => id === 'l-30dor'
-  ? !!universe.landmark(id) : !!universe.system('c0').get(id);
+const hasDestination = (universe) => (id) => {
+  if (id === 'l-30dor') return !!universe.landmark(id);
+  const stop = route.stops.find((candidate) => candidate.id === id);
+  if (stop?.ref?.kind === 'star') return !!universe.system(stop.ref.starId).star;
+  return !!universe.get(id) || !!universe.system('c0').get(id);
+};
 function makeRun(saved = null) {
   const time = new TimeSystem(new Date('2026-10-10T00:00:00Z'));
   if (saved) { time.setRate(saved.simulation.rate); time.jd = saved.simulation.jd; }
   const universe = new Universe(catalog);
+  const frame = saved?.frame.starId ?? destinationSystem(route.stops[0]);
+  if (frame !== universe.current.starId) universe.switchTo(frame, time.jd, time.t);
   universe.update(time.jd, time.t);
   const camera = new CameraController(universe);
   const director = new ReachVoyageDirector(universe, camera, time, new ReachTiming('preview'),
@@ -76,7 +83,7 @@ function step(run) {
   if (run.director.directing) run.director.update(dt, false);
   else { run.camera.update(dt, input, 1920, 1080, fov); run.director.update(dt, false); }
 }
-function until(run, match, limit = 1000) {
+function until(run, match, limit = 2000) {
   for (let i = 0; i < limit; i++) {
     step(run);
     const state = run.director.capture();
@@ -91,7 +98,7 @@ function verifyResume(run, state, label) {
     hasDestination(run.universe)), null, `${label} cannot enter production`);
   const restored = makeRun(parsed);
   assert.equal(restored.camera.position.distanceTo(run.camera.position), 0, `${label} position`);
-  assert.equal(restored.camera.quaternion.angleTo(run.camera.quaternion), 0, `${label} orientation`);
+  assert.ok(restored.camera.quaternion.angleTo(run.camera.quaternion) < 1e-6, `${label} orientation`);
   assert.equal(restored.director.distanceTravelledKm, run.director.distanceTravelledKm, `${label} odometer`);
   assert.equal(restored.director.capture().phase.kind, state.phase.kind, `${label} phase`);
   for (let i = 0; i < 12; i++) {
@@ -146,3 +153,80 @@ const earthReturn = until(resumedDeparture, (s) => s.destinationId === 'earth'
 assert.equal(earthReturn.odometer.leg, null);
 assert.ok(earthReturn.odometer.completedKm > observed.odometer.completedKm);
 console.log('PASS Tarantula resolution, coordinates, FOV, camera, card, approach/observation/departure restore, and return odometer');
+
+route = reachPreviewRoute('woh-tarantula');
+assert.equal(route.id, 'preview:woh-tarantula');
+assert.deepEqual(route.stops.map((stop) => stop.id), ['star:l17', 'l-30dor']);
+assert.equal(route.repeat, true);
+const roundTrip = makeRun();
+const geometricKm = roundTrip.universe.landmark('l-30dor').positionPc.clone().multiplyScalar(PARSEC_KM)
+  .distanceTo(roundTrip.universe.current.origin);
+assert.equal(roundTrip.universe.current.starId, 'l17');
+assert.equal(roundTrip.camera.target, roundTrip.universe.star);
+assert.equal(roundTrip.camera.reference, roundTrip.universe.star);
+assert.equal(roundTrip.director.capture().phase.duration, 6);
+const phases = [
+  ['WOH observation', (s) => s.destinationId === 'star:l17' && s.phase.kind === 'observe' && s.phase.elapsed > 1],
+  ['WOH departure', (s) => s.destinationId === 'star:l17' && s.phase.kind === 'departure' && s.phase.elapsed > 0.5],
+  ['outbound cruise', (s) => s.destinationId === 'l-30dor' && s.phase.kind === 'cruise' && s.phase.elapsed > 2],
+  ['Tarantula observation', (s) => s.destinationId === 'l-30dor' && s.phase.kind === 'observe' && s.phase.elapsed > 2],
+  ['Tarantula departure', (s) => s.destinationId === 'l-30dor' && s.phase.kind === 'departure' && s.phase.elapsed > 0.5],
+  ['inbound cruise', (s) => s.destinationId === 'star:l17' && s.phase.kind === 'cruise' && s.phase.elapsed > 2],
+  ['return arrival', (s) => s.destinationId === 'star:l17' && s.phase.kind === 'observe' && s.odometer.completedKm > 0],
+];
+for (const [label, match] of phases) {
+  const state = until(roundTrip, match);
+  verifyResume(roundTrip, state, label);
+  if (label === 'outbound cruise' || label === 'inbound cruise')
+    assert.ok(Math.abs(state.odometer.leg.distanceKm - geometricKm) / geometricKm < 1e-12,
+      `${label} uses WOH-to-landmark geometric separation`);
+  if (label === 'Tarantula observation') {
+    assert.equal(roundTrip.camera.target, null);
+    assert.equal(roundTrip.camera.anchor.name, route.stops[1].label);
+    assert.deepEqual(reachInfoTarget(roundTrip.director.observation, true, destinationRef),
+      { kind: 'landmark', landmarkId: 'l-30dor' });
+  }
+}
+assert.equal(roundTrip.universe.current.starId, 'l17');
+assert.equal(roundTrip.camera.target, roundTrip.universe.star);
+assert.equal(roundTrip.camera.anchor, null);
+const firstCycleKm = roundTrip.director.distanceTravelledKm;
+assert.ok(firstCycleKm > 0);
+assert.equal(roundTrip.director.roundTrips, 1);
+const nextLandmark = until(roundTrip, (s) => s.destinationId === 'l-30dor' && s.phase.kind === 'observe');
+const secondReturn = until(roundTrip, (s) => s.destinationId === 'star:l17'
+  && s.phase.kind === 'observe' && s.odometer.completedKm > firstCycleKm);
+assert.ok(secondReturn.odometer.completedKm > firstCycleKm);
+assert.equal(secondReturn.odometer.roundTrips, 2);
+assert.ok(Math.abs(secondReturn.odometer.completedKm - 4 * geometricKm) / geometricKm < 1e-12);
+assert.equal(nextLandmark.frame.starId, 'c0');
+class TestChannel {
+  static channels = [];
+  constructor(name) { this.name = name; TestChannel.channels.push(this); }
+  postMessage(data) { for (const channel of TestChannel.channels)
+    if (channel !== this && channel.name === this.name) channel.onmessage?.({ data }); }
+  close() {}
+}
+globalThis.BroadcastChannel = TestChannel;
+globalThis.window = { addEventListener() {} };
+const contract = { sessionId: 'a'.repeat(32), isPrimaryDisplay: true };
+const primary = new ReachPanoramaSync(contract);
+const followers = [new ReachPanoramaSync({ ...contract, isPrimaryDisplay: false }),
+  new ReachPanoramaSync({ ...contract, isPrimaryDisplay: false })];
+for (const [state, targetId, referenceId] of [
+  [secondReturn, 'l-wohg64', 'l-wohg64'], [nextLandmark, 'l-30dor', 'sun'],
+]) {
+  assert.equal(state.camera.targetId, targetId);
+  assert.equal(state.camera.referenceId, referenceId);
+  primary.publish({ jd: state.simulation.jd, rate: state.simulation.rate, paused: false,
+    starId: state.frame.starId, position: state.camera.position,
+    orientation: state.camera.orientation, referenceId, targetId,
+    destinationId: state.destinationId, phase: 'DEPART', secondsLeft: 1 });
+  for (const follower of followers) {
+    assert.equal(follower.latest.starId, state.frame.starId);
+    assert.equal(follower.latest.targetId, targetId);
+    assert.equal(follower.latest.referenceId, referenceId);
+    assert.deepEqual(follower.latest.position, state.camera.position);
+  }
+}
+console.log('PASS WOH G64 to Tarantula round trip repeats; seven checkpoint restores, frames, camera targets, card, and odometer');

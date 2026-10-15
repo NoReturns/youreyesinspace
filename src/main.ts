@@ -24,7 +24,7 @@ import type { NamedStarScreen } from './render/StarPoints';
 import { Input } from './input/Input';
 import { CameraController } from './camera/CameraController';
 import { ReachVoyageDirector, REACH_ALPHA_DESTINATION_ID, REACH_PRODUCTION_ROUTE, reachPreviewRoute } from './reach/ReachVoyageDirector';
-import { destinationRef, reachPilotStarAppearance, reachStarVisualDrift, REACH_PROXIMA_PILOT } from './reach/ReachDestinations';
+import { destinationRef, destinationSystem, reachPilotStarAppearance, reachStarVisualDrift, REACH_PROXIMA_PILOT } from './reach/ReachDestinations';
 import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
 import { ReachScaleComparison, scalePreviewEnabled } from './reach/ReachScaleComparison';
 import { ReachOdometerOverlay, readOdometerContract } from './reach/ReachOdometer';
@@ -72,6 +72,7 @@ if (REACH_INSPECT_ID && !REACH_INSPECT_FIXTURES.has(REACH_INSPECT_ID))
   throw new Error(`Unknown Reach inspection checkpoint: ${REACH_INSPECT_ID}`);
 const REACH_PREVIEW_ROUTE = REACH_PREVIEW_ID ? reachPreviewRoute(REACH_PREVIEW_ID) : null;
 if (REACH_PREVIEW_ID && !REACH_PREVIEW_ROUTE) throw new Error(`Unknown Reach preview stop: ${REACH_PREVIEW_ID}`);
+const REACH_ROUND_TRIP_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:woh-tarantula';
 const REACH_ALPHA_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:alpha-centauri';
 const REACH_PREVIEW_STAR_ID = REACH_PREVIEW_ROUTE?.stops[1]?.ref?.kind === 'star'
   ? REACH_PREVIEW_ROUTE.stops[1].ref.starId : null;
@@ -129,9 +130,11 @@ class App implements UIHost {
   private readonly panoramaSync = this.panorama ? new ReachPanoramaSync(this.panorama) : null;
   private lastPanoramaSequence = -1;
   private readonly reachStore: ReachJourneyStore | null = REACH_MODE && !REACH_FLICKER
-    && !REACH_PREVIEW_ROUTE && !REACH_SURFACE_PREVIEW && !REACH_INSPECT_ID
+    && (!REACH_PREVIEW_ROUTE || REACH_ROUND_TRIP_PREVIEW) && !REACH_SURFACE_PREVIEW && !REACH_INSPECT_ID
     && this.panorama?.isPrimaryDisplay !== false
-    ? new LocalStorageReachJourneyStore(REACH_PILOT ? REACH_PROXIMA_PILOT_KEY : undefined) : null;
+    ? new LocalStorageReachJourneyStore(REACH_ROUND_TRIP_PREVIEW
+      ? 'the-reach:journey:preview-woh-tarantula:v1'
+      : REACH_PILOT ? REACH_PROXIMA_PILOT_KEY : undefined) : null;
   private lastReachSave = performance.now();
   private reachCheckpointWritable = true;
   private readonly arrivalTrace = REACH_TRACE
@@ -195,7 +198,7 @@ class App implements UIHost {
     this.universe = new Universe(catalog,
       REACH_MODE ? createAlphaCentauriPreviewSystem(catalog) : null);
     let savedJourney = REACH_PREVIEW_ROUTE || REACH_SURFACE_PREVIEW ? null : diagnosticJourney;
-    if (this.reachStore && !REACH_PREVIEW_ROUTE && !REACH_SURFACE_PREVIEW) {
+    if (this.reachStore) {
       const stored = inspectReachJourneyStore(this.reachStore, REACH_ROUTE, (id) => {
         const stop = REACH_ROUTE.stops.find((candidate) => candidate.id === id);
         if (stop) {
@@ -222,6 +225,8 @@ class App implements UIHost {
       this.time.jd = savedJourney.simulation.jd;
       if (savedJourney.frame.starId !== this.universe.current.starId)
         this.universe.switchTo(savedJourney.frame.starId, this.time.jd, this.time.t);
+    } else if (REACH_ROUND_TRIP_PREVIEW) {
+      this.universe.switchTo(destinationSystem(REACH_ROUTE.stops[0]), this.time.jd, this.time.t);
     }
     // Evaluate once so orbital elements exist before building renderers
     this.universe.update(this.time.jd, this.time.t);

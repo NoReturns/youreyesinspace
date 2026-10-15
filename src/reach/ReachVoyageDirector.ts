@@ -115,8 +115,13 @@ export function reachLandmarkObservationDistance(radiusKm: number, verticalFovRa
   return radiusKm / (0.4 * Math.tan(verticalFovRad / 2));
 }
 
-/** Development-only caller supplies a selected production stop; this route has no persistence key. */
+/** Development-only routes are isolated from the production itinerary. */
 export function reachPreviewRoute(id: string): ReachRoute | null {
+  if (id === 'woh-tarantula') return { id: 'preview:woh-tarantula', version: 1, repeat: true,
+    stops: [REACH_ITINERARY[REACH_ITINERARY.length - 1],
+      { id: 'l-30dor', profile: 'landmark', label: 'Tarantula Nebula (30 Doradus)',
+        ref: { kind: 'landmark', landmarkId: 'l-30dor' } }],
+  };
   if (id === 'tarantula') return { id: 'preview:tarantula', version: 1, repeat: true,
     stops: [REACH_ITINERARY[0], { id: 'l-30dor', profile: 'landmark', label: 'Tarantula Nebula (30 Doradus)',
       ref: { kind: 'landmark', landmarkId: 'l-30dor' } }],
@@ -263,10 +268,14 @@ export class ReachVoyageDirector {
       else this.destination(stop);
     }
     if (saved) { this.restore(saved); return; }
-    const earth = this.body('earth');
-    const sunward = new Vector3().subVectors(universe.star.position, earth.position).normalize();
-    const view = sunward.addScaledVector(earth.pole, 0.25).normalize();
-    camera.placeAt(earth, view.multiplyScalar(earth.radius * 4));
+    const initial = this.stops[0];
+    const body = this.destination(initial);
+    const view = initial.profile === 'star'
+      ? new Vector3(0, 0.3, 1).normalize()
+      : new Vector3().subVectors(universe.star.position, body.position).normalize()
+        .addScaledVector(body.pole, 0.25).normalize();
+    camera.placeAt(body, view.multiplyScalar(body.radius * (initial.profile === 'star'
+      ? initial.starPresentation?.observationDistanceRadii ?? 40 : 4)));
     camera.autoOrbit = OBSERVATION_ORBIT;
     this.observeDuration = this.timing.observe(this.stops[0]);
     this.observeLeft = this.observeDuration;
@@ -426,6 +435,12 @@ export class ReachVoyageDirector {
           if (!preRoundTripArrival) this.roundTripCount++;
           this.direction = 'outbound';
           this.cycleItineraryVersion = this.route.version;
+        }
+      } else if (this.route.id === 'preview:woh-tarantula') {
+        if (this.stop === this.stops.length - 1) this.direction = 'inbound';
+        else if (this.direction === 'inbound') {
+          this.roundTripCount++;
+          this.direction = 'outbound';
         }
       }
       this.transitionFromVersion = null;
