@@ -198,8 +198,9 @@ export class ReachVoyageDirector {
   get directing(): boolean { return !!this.alpha || this.stage === 'departure' || this.stage === 'flyby'; }
   get observation(): { stop: ReachStop; elapsed: number; remaining: number; departing: boolean } | null {
     if (this.stage !== 'observe') return null;
-    const remaining = this.alpha ? this.alpha.secondsLeft : this.observeLeft;
-    return { stop: this.stops[this.stop], elapsed: Math.max(0, this.observeDuration - remaining), remaining,
+    const remaining = this.alpha ? this.alpha.observationRemaining : this.observeLeft;
+    const elapsed = this.alpha ? this.alpha.observationElapsed : Math.max(0, this.observeDuration - remaining);
+    return { stop: this.stops[this.stop], elapsed, remaining,
       departing: this.route.repeat || this.stop < this.stops.length - 1 };
   }
   get alphaPreview(): boolean { return this.route.id === 'preview:alpha-centauri'; }

@@ -13,8 +13,9 @@ import type { StarPoints } from '../render/StarPoints';
 import type { GalaxySprites } from '../render/GalaxySprites';
 import type { LandmarkSprites } from '../render/LandmarkSprites';
 import { LANDMARK_KIND_LABEL } from '../data/landmarks';
+import { starCardMetadata } from '../data/StarCatalog';
 import { AU_KM, LIGHT_YEAR_KM, PARSEC_KM, RAD } from '../core/constants';
-import { LUM_CLASS_DESC, SUN_MASS_KG } from '../astro/stellar';
+import { SUN_MASS_KG } from '../astro/stellar';
 import { GALAXY_TYPE_LABEL } from '../galaxy/GalaxyModel';
 import { catalogIndexOf, type StarId } from '../core/Universe';
 import type { Settings } from './Settings';
@@ -670,8 +671,9 @@ export class UI {
     const isBH = u.blackHole(id) !== undefined;
     const isExtra = u.extraSystem(id) !== undefined;
     const isProc = ci < 0 && !isExtra;
+    const card = starCardMetadata(s);
     this.infoName.textContent = s.name;
-    this.infoType.textContent = isBH ? _('Kara delik sistemi') : _('Yıldız') + ' · ' + (s.isWhiteDwarf ? _('Beyaz cüce') : _(LUM_CLASS_DESC[s.lumClass] ?? ''));
+    this.infoType.textContent = isBH ? _('Kara delik sistemi') : _('Yıldız') + ' · ' + _(card.classification);
     const galName = ci < 0 ? u.galaxies.name(u.galaxyOfStar(id)) : '';
     this.infoParent.textContent = isExtra ? `${_('Gerçek nesne')} · ${galName}` : isProc ? `${_('Prosedürel yıldız')} · ${galName}` : s.names?.constellation ? _('{name} takımyıldızı', { name: s.names.constellation }) : _('Yıldız kataloğu (HYG)');
 
@@ -683,7 +685,7 @@ export class UI {
     rows.push(['Kadir (buradan)', fixed(appMag, 2)]);
     rows.push('sep');
     rows.push(['Güneş\'e uzaklık', isProc ? fmtLightYears(s.distancePc * PARSEC_KM) : `${fixed((s.distancePc * PARSEC_KM / LIGHT_YEAR_KM), 2)} ly (${fixed(s.distancePc, 2)} pc)`]);
-    rows.push(['Spektral sınıf', s.catalogSpectral || s.spectral]);
+    rows.push(['Spektral sınıf', card.spectral]);
     if (!isProc) rows.push(['Kadir (Dünya\'dan)', fixed(s.mag, 2)]);
     rows.push(['Mutlak kadir', fixed(s.absMag, 2)]);
     rows.push(['B−V renk', fixed(s.bv, 2)]);
@@ -709,6 +711,7 @@ export class UI {
       : u.hasMeasuredInfo(id)
         ? `${_(sys.star.data.description ?? '')} ${_('(* Tayf ve yörünge ölçümlerinden gelen değerler; katalog tahminlerinin yerini alır.)')}`
         : `${_(sys.star.data.description ?? '')} ${_('(* Kadir, uzaklık ve B−V renginden türetilen tahminler.)')}`;
+    if (card.note) this.infoDesc.textContent += ` ${_(card.note)}`;
   }
 
   private renderInfo(b: CelestialBody, camDist: number): void {

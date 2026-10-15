@@ -42,6 +42,9 @@ export function reachInfoPlacement(projectedX: number, projectedY: number, radiu
 
 export function reachInfoOpacity(observation: ReachObservation | null): number {
   if (!observation) return 0;
-  return Math.max(0, Math.min(1, observation.elapsed / 5,
-    observation.departing ? observation.remaining / 5 : 1));
+  const duration = observation.elapsed + observation.remaining;
+  if (duration <= 0) return 0;
+  const fadeDuration = Math.min(5, duration / 4);
+  return Math.max(0, Math.min(1, observation.elapsed / fadeDuration,
+    observation.departing ? observation.remaining / fadeDuration : 1));
 }

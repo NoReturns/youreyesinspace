@@ -139,6 +139,12 @@ export class ReachAlphaCinematic {
   get stage(): AlphaCinematicStage { return ALPHA_SHOTS[this.shot].stage; }
   get label(): string { return ALPHA_SHOTS[this.shot].label; }
   get secondsLeft(): number { return this.terminal ? 0 : ALPHA_SHOTS[this.shot].seconds - this.elapsed; }
+  get observationElapsed(): number {
+    return ALPHA_SHOTS.slice(0, this.shot).reduce((total, shot) => total + shot.seconds, this.elapsed);
+  }
+  get observationRemaining(): number {
+    return ALPHA_SHOTS.slice(this.shot + 1).reduce((total, shot) => total + shot.seconds, this.secondsLeft);
+  }
   get terminal(): boolean { return this.shot === ALPHA_SHOTS.length - 1 && this.elapsed >= ALPHA_SHOTS[this.shot].seconds; }
   get target(): Vector3 { return this.aim.clone(); }
   capture(): ReachBinaryPhase {

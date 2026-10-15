@@ -18,6 +18,7 @@ const entry = `
   export { StarCatalog } from './src/data/StarCatalog.ts';
   export { LANDMARKS } from './src/data/landmarks.ts';
   export { ReachTiming, reachTravelKind, reachObserveKind } from './src/reach/ReachTiming.ts';
+  export { reachInfoOpacity } from './src/reach/ReachInfoCard.ts';
 `;
 const bundle = await rolldown({
   input: '\0reach-v4-test', transform: { define: { 'import.meta.env.DEV': 'false' } },
@@ -44,7 +45,7 @@ const { ReachVoyageDirector, REACH_ITINERARY, REACH_PRODUCTION_ROUTE, V4_STOP_ID
   reachStopIdsForVersion, ReachPanoramaSync,
   parseReachJourney, inspectReachJourneyStore, destinationRef, createAlphaCentauriPreviewSystem,
   ALPHA_SYSTEM_ID, ALPHA_A_INDEX, ALPHA_B_INDEX, CameraController, TimeSystem, Universe,
-  StarCatalog, LANDMARKS, ReachTiming, reachTravelKind, reachObserveKind } = module.exports;
+  StarCatalog, LANDMARKS, ReachTiming, reachTravelKind, reachObserveKind, reachInfoOpacity } = module.exports;
 const bin = readFileSync('public/data/stars.bin');
 const names = JSON.parse(readFileSync('public/data/star-names.json', 'utf8'));
 const catalog = new StarCatalog(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength), names);
@@ -196,19 +197,42 @@ assert.deepEqual(binary.bodies.map((body) => body.data.type), ['barycenter', 'st
 assert.ok(binary.get(`s${ALPHA_A_INDEX}-star`) && binary.get(`s${ALPHA_B_INDEX}-star`));
 
 const checkedStages = new Set();
+const alphaShotDurations = [
+  ['establish', 9], ['approach-a', 10], ['observe-a', 8], ['retract-a', 9],
+  ['cross-to-b', 14], ['approach-b', 10], ['observe-b', 8], ['retract-b', 10],
+  ['final-overview', 10],
+];
+const alphaTotalSeconds = alphaShotDurations.reduce((total, [, seconds]) => total + seconds, 0);
 let pending = null;
 let inboundSnapshot = null;
 let previousKm = 0;
 for (let i = 0; i < 40_000 && run.director.roundTrips === 0; i++) {
   step(run);
   const state = run.director.capture();
+  if (state.phase.kind === 'binary') {
+    const observation = run.director.observation;
+    const shotIndex = alphaShotDurations.findIndex(([shot]) => shot === state.phase.shot);
+    assert.ok(observation && shotIndex >= 0);
+    assert.equal(state.phase.duration, alphaShotDurations[shotIndex][1]);
+    const elapsed = alphaShotDurations.slice(0, shotIndex)
+      .reduce((total, [, seconds]) => total + seconds, state.phase.elapsed);
+    assert.ok(Math.abs(observation.elapsed - elapsed) < 1e-9);
+    assert.ok(Math.abs(observation.remaining - (alphaTotalSeconds - elapsed)) < 1e-9);
+    assert.equal(observation.stop.id, 'alpha-centauri-ab');
+    if (shotIndex > 0 && state.phase.elapsed === 0)
+      assert.equal(reachInfoOpacity(observation), 1, 'card stays visible across Alpha shots');
+  }
   assert.ok(run.director.distanceTravelledKm + 1e-4 >= previousKm, 'odometer never decreases');
   previousKm = run.director.distanceTravelledKm;
   if (pending) {
     step(pending);
     const next = pending.director.capture();
     assert.equal(next.phase.kind, state.phase.kind, 'binary reload keeps phase');
-    if (state.phase.kind === 'binary') assert.equal(next.phase.shot, state.phase.shot);
+    if (state.phase.kind === 'binary') {
+      assert.equal(next.phase.shot, state.phase.shot);
+      assert.deepEqual(pending.director.observation, run.director.observation,
+        'binary reload keeps card timing');
+    }
     assert.ok(pending.camera.position.distanceTo(run.camera.position) < 1e-3,
       'binary reload keeps camera position');
     const angle = pending.camera.quaternion.angleTo(run.camera.quaternion);

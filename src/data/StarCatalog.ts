@@ -3,7 +3,7 @@ import { _ } from '../i18n';
 import { PARSEC_KM } from '../core/constants';
 import {
   absoluteMagnitude, bvToTemperature, luminosityFromAbsMag, massFromLuminosity, radiusFromLuminosity,
-  spectralFromTemperature, LUM_CLASS_LABEL, SUN_MASS_KG, SUN_RADIUS_KM,
+  spectralFromTemperature, LUM_CLASS_LABEL, LUM_CLASS_DESC, SUN_MASS_KG, SUN_RADIUS_KM,
 } from '../astro/stellar';
 
 const RECORD = 24;
@@ -42,8 +42,22 @@ export interface StarInfo {
   lumClass: number;
   catalogSpectral: string;
   isWhiteDwarf: boolean;
+  /** Authored classification for non-catalogue stars that do not fit a luminosity class. */
+  classification?: string;
+  /** Authored scientific context displayed with the information card. */
+  classificationNote?: string;
   /** true for procedurally generated stars (not in the HYG catalogue) */
   procedural?: boolean;
+}
+
+export function starCardMetadata(s: Pick<StarInfo, 'classification' | 'classificationNote' | 'lumClass' | 'isWhiteDwarf' | 'catalogSpectral' | 'spectral'>): {
+  classification: string; spectral: string; note: string;
+} {
+  return {
+    classification: s.isWhiteDwarf ? 'Beyaz cüce' : s.classification ?? LUM_CLASS_DESC[s.lumClass] ?? '',
+    spectral: s.catalogSpectral || s.spectral,
+    note: s.classificationNote ?? '',
+  };
 }
 
 /**

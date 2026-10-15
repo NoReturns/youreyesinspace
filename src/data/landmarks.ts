@@ -25,6 +25,8 @@ export interface LandmarkStar {
   temperature: number;
   luminosity: number;
   spectral: string;
+  classification?: string;
+  classificationNote?: string;
 }
 
 export interface LandmarkDef {
@@ -91,7 +93,7 @@ export const LANDMARKS: LandmarkDef[] = [
     summary: 'Samanyolu\'nun en parlak ve en kararsız yıldızı',
     description: 'Yaklaşık 100 ve 30 güneş kütleli iki dev yıldızdan oluşan çift. 1843\'teki "Büyük Patlama"da gökyüzünün ikinci en parlak yıldızı oldu ve 10 güneş kütlesinden fazla madde fırlatarak Homunculus Bulutsusu\'nu oluşturdu. Yakın gelecekte (astronomik ölçekte) süpernova olması beklenir.',
     facts: { 'Uzaklık': '2 300 pc (7 500 ışık yılı)', 'Parlaklık': '~5 milyon L☉', 'Kütle': '~100 + 30 M☉', 'Yörünge periyodu (çift)': '5,54 yıl', 'Tür': 'Parlak mavi değişen (LBV)' },
-    star: { massSolar: 100, radiusSolar: 300, temperature: 15_000, luminosity: 5e6, spectral: 'LBV' },
+    star: { massSolar: 100, radiusSolar: 300, temperature: 15_000, luminosity: 5e6, spectral: 'LBV', classification: 'Parlak mavi değişen (LBV)' },
   },
   {
     id: 'l-m1', name: 'Yengeç Bulutsusu (M1)', kind: 'remnant', galaxy: null, ra: 83.633, dec: 22.0145, distancePc: 2000, radiusPc: 1.7, absMag: -3.1, color: SNR,
@@ -166,7 +168,7 @@ export const LANDMARKS: LandmarkDef[] = [
     summary: 'Bilinen en kütleli ve en parlak yıldız',
     description: 'Tarantula Bulutsusu\'nun kalbindeki R136 kümesinin en parlak üyesi: yaklaşık 200 güneş kütlesi, 4,7 milyon güneş parlaklığı, 46 000 K yüzey sıcaklığı. Hidrojen yakan bir Wolf-Rayet yıldızı (WN5h); 1 milyon yıldan genç ve rüzgârlarıyla her yıl Dünya\'nın kütlesinin binlerce katını kaybediyor.',
     facts: { 'Kütle': '~196 M☉ (170–230)', 'Parlaklık': '4,7 × 10⁶ L☉', 'Sıcaklık': '46 000 K', 'Yarıçap': '~39 R☉', 'Tayf': 'WN5h', 'Yaş': '< 1 milyon yıl' },
-    star: { massSolar: 196, radiusSolar: 39, temperature: 46_000, luminosity: 4.7e6, spectral: 'WN5h' },
+    star: { massSolar: 196, radiusSolar: 39, temperature: 46_000, luminosity: 4.7e6, spectral: 'WN5h', classification: 'Wolf-Rayet (WN5h)' },
   },
   {
     id: 'l-sn1987a', name: 'SN 1987A', kind: 'remnant', galaxy: 'Büyük Macellan', ra: 83.8667, dec: -69.2697, radiusPc: 0.6, absMag: -6, color: SNR,
@@ -177,9 +179,13 @@ export const LANDMARKS: LandmarkDef[] = [
   {
     id: 'l-wohg64', name: 'WOH G64', kind: 'star', galaxy: 'Büyük Macellan', ra: 73.294, dec: -68.3417, radiusPc: 0.05, absMag: -8.5, color: [1, 0.6, 0.4],
     summary: 'Bilinen en büyük yıldızlardan — 1 500 güneş yarıçapı',
-    description: 'Büyük Macellan Bulutu\'nda, Güneş\'in yerine konsa Jüpiter\'in yörüngesini yutacak bir kırmızı hiperdev. 2024\'te VLTI ile Samanyolu dışında yakından görüntülenen ilk yıldız oldu: kalın bir toz kozasıyla sarılı ve süpernova öncesi son evrelerinde.',
+    description: 'Büyük Macellan Bulutu\'nda, tarihsel olarak kırmızı süperdev olarak gözlemlenen dev bir yıldız. Güneş\'in yerine konsa Jüpiter\'in yörüngesini yutacak kadar büyüktür. 2024\'te VLTI ile Samanyolu dışında yakından görüntülenen ilk yıldız oldu; kalın bir toz kozasıyla sarılıdır.',
     facts: { 'Yarıçap': '~1 540 R☉', 'Kütle': '~25 M☉', 'Parlaklık': '2,8 × 10⁵ L☉', 'Sıcaklık': '~3 400 K', 'Tayf': 'M7.5 I' },
-    star: { massSolar: 25, radiusSolar: 1540, temperature: 3400, luminosity: 2.8e5, spectral: 'M7.5 I' },
+    // Historical M7.5 I spectrum; 2026 interpretations differ on a yellow-hypergiant transition.
+    // https://doi.org/10.1038/s41550-026-02789-7 ; https://arxiv.org/abs/2601.02057
+    star: { massSolar: 25, radiusSolar: 1540, temperature: 3400, luminosity: 2.8e5, spectral: 'M7.5 I',
+      classification: 'Evrimleşmiş süperdev',
+      classificationNote: 'M7.5 I tarihsel katalog tayfıdır. 2026 çalışmaları farklı yorumlara varıyor: biri sarı hiperdev evresine geçiş öneriyor; diğeri yıldızın hâlâ kırmızı süperdev olduğunu savunuyor.' },
   },
   {
     id: 'l-ngc1850', name: 'NGC 1850', kind: 'cluster', galaxy: 'Büyük Macellan', ra: 77.19, dec: -68.76, radiusPc: 12, absMag: -9.6, color: YOUNG_CLUSTER,
@@ -220,7 +226,7 @@ export const LANDMARKS: LandmarkDef[] = [
     summary: 'Evrenin boyutunu değiştiren yıldız (1923)',
     description: 'Edwin Hubble\'ın 1923\'te Andromeda\'da bulduğu değişen yıldız; periyot-parlaklık ilişkisi "Andromeda Bulutsusu"nun Samanyolu dışında ayrı bir galaksi olduğunu kanıtladı. 31,4 günlük bir Sefeid; bugün Hubble Uzay Teleskobu da onu gözledi.',
     facts: { 'Uzaklık': '765 kpc (M31)', 'Periyot': '31,4 gün', 'Görünür kadir': '18,5–19,5', 'Tür': 'Klasik Sefeid', 'Keşif': 'Ekim 1923, Hubble, 100 inç Hooker' },
-    star: { massSolar: 7, radiusSolar: 110, temperature: 5800, luminosity: 1.2e4, spectral: 'F–G Ib' },
+    star: { massSolar: 7, radiusSolar: 110, temperature: 5800, luminosity: 1.2e4, spectral: 'F–G Ib', classification: 'Klasik Sefeid' },
   },
   {
     id: 'l-sandr', name: 'S Andromedae (SN 1885A)', kind: 'remnant', galaxy: 'Andromeda', ra: 10.6797, dec: 41.2678, radiusPc: 1.2, absMag: -4, color: SNR,
@@ -250,5 +256,6 @@ export function landmarkStarBodies(def: LandmarkDef): BodyData[] {
 export function landmarkStarInfo(def: LandmarkDef, positionPc: Vector3): StarInfo {
   if (def.pulsar) return pulsarInfo(def, positionPc);
   const s = def.star!;
-  return syntheticInfo(def.name, positionPc, s.massSolar, s.radiusSolar, s.temperature, s.luminosity, s.spectral);
+  return { ...syntheticInfo(def.name, positionPc, s.massSolar, s.radiusSolar, s.temperature, s.luminosity, s.spectral),
+    classification: s.classification, classificationNote: s.classificationNote };
 }

@@ -44,11 +44,22 @@ assert.equal(reachInfoTarget(null, true, resolve), null);
 assert.equal(reachInfoTarget(null, false, resolve), null);
 assert.equal(reachInfoOpacity(earth), 0);
 assert.equal(reachInfoOpacity({ ...earth, elapsed: 2 }), 0.4);
-assert.equal(reachInfoOpacity({ ...star, remaining: 2 }), 0.4);
+assert.equal(reachInfoOpacity({ ...star, elapsed: 26, remaining: 2 }), 0.4);
 assert.equal(reachInfoOpacity(star), 1);
 assert.equal(reachInfoOpacity(null), 0);
 assert.equal(reachInfoOpacity({ ...star, remaining: 0 }), 0);
 assert.equal(reachInfoOpacity({ ...star, remaining: 0, departing: false }), 1);
+for (const [duration, fade] of [[8, 2], [9, 2.25], [20, 5], [60, 5]]) {
+  const opacityAt = (elapsed) => reachInfoOpacity({ ...earth, elapsed, remaining: duration - elapsed });
+  assert.equal(opacityAt(0), 0, `${duration}s starts transparent`);
+  assert.equal(opacityAt(fade / 2), 0.5, `${duration}s fades in`);
+  assert.equal(opacityAt(fade), 1, `${duration}s reaches full opacity`);
+  assert.equal(opacityAt(duration / 2), 1, `${duration}s has a reading interval`);
+  assert.equal(opacityAt(duration - fade), 1, `${duration}s remains visible before fade-out`);
+  assert.equal(opacityAt(duration - fade / 2), 0.5, `${duration}s fades out`);
+  assert.equal(opacityAt(duration), 0, `${duration}s ends transparent`);
+}
+assert.equal(reachInfoOpacity({ ...earth, elapsed: 0, remaining: 0 }), 0);
 
 // Keep the explorer's original controls and update path while Reach uses the passive card.
 const html = readFileSync('index.html', 'utf8');
