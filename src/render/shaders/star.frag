@@ -7,6 +7,9 @@ uniform float uIntensity;
 uniform vec3 uDrift;
 uniform float uMotionStrength;
 uniform float uColorWarmth;
+#ifdef BETELGEUSE_CONVECTION
+uniform vec3 uConvectionPhase;
+#endif
 
 varying vec3 vObjPos;
 varying vec3 vWorldPos;
@@ -20,6 +23,20 @@ void main() {
   vec3 V = normalize(-vWorldPos);
   float NdotV = max(dot(N, V), 0.0);
 
+  float cells;
+  float gran;
+#ifdef BETELGEUSE_CONVECTION
+  // Two anchored, large-scale fields morph into one another; boundaries reshape
+  // without dragging the entire photosphere across the sphere.
+  float broadA = snoise(p * 2.4 + vec3(uSeed * 0.13, 4.1, 9.7));
+  float broadB = snoise(p * 2.4 + vec3(7.3, uSeed * 0.17, 15.1));
+  float convection = broadA * uConvectionPhase.x + broadB * uConvectionPhase.y;
+  float lanes = 1.0 - smoothstep(0.06, 0.24, abs(convection));
+  float fine = snoise(p * 12.0 + vec3(uConvectionPhase.xy * 0.65, uConvectionPhase.z * 0.4));
+  float micro = snoise(p * 36.0 + uSeed * 0.31);
+  cells = 0.5 + 0.5 * convection;
+  gran = clamp(0.83 + 0.32 * convection - 0.19 * lanes + 0.08 * fine + 0.025 * micro, 0.34, 1.2);
+#else
   // Granulation: multi-scale animated noise
   float t = uTime * 0.05;
   vec3 drift = uDrift * uMotionStrength;
@@ -27,8 +44,8 @@ void main() {
   float g2 = fbm(p * 45.0 - uSeed + vec3(-t * 1.3, t, t * 0.5) - drift * 1.3, 3);
   float g3 = snoise(p * 140.0 + vec3(t * 2.0) + drift * 2.0);
   // Granulation cells: bright centres, dark inter-granular lanes
-  float cells = 1.0 - abs(g2) * 1.6;
-  float gran = 0.62 + 0.30 * g1 + 0.28 * cells + 0.06 * g3;
+  cells = 1.0 - abs(g2) * 1.6;
+  gran = 0.62 + 0.30 * g1 + 0.28 * cells + 0.06 * g3;
   gran = clamp(gran, 0.3, 1.25);
 
   // Sunspots: dark umbra + penumbra that slowly drift
@@ -37,6 +54,7 @@ void main() {
   float penumbra = smoothstep(0.66, 0.76, spotField) - spots;
   gran *= 1.0 - spots * 0.88;
   gran *= 1.0 - penumbra * 0.45;
+#endif
 
   // Limb darkening
   float limb = 0.3 + 0.7 * pow(NdotV, 0.55);
@@ -55,6 +73,9 @@ void main() {
   float lum = dot(color, vec3(0.299, 0.587, 0.114));
   color = max(mix(vec3(lum), color, 1.6), 0.0);
   color *= vec3(1.0, 1.0 - 0.6 * uColorWarmth, 1.0 - 0.7 * uColorWarmth);
+#ifdef BETELGEUSE_CONVECTION
+  color *= vec3(1.0, 0.72, 0.52);
+#endif
 
   // Hotter photospheres are brighter per unit area (kept mild: tone mapping would clip anyway)
   color *= uIntensity * mix(0.85, 1.45, smoothstep(3000.0, 12000.0, uTemperature));

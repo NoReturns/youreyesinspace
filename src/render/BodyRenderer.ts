@@ -168,11 +168,15 @@ export class BodyView {
     if (a.kind === 'star' || a.kind === 'pulsar') {
       // neutron stars: million-kelvin surface → render as a blue-white star
       const T = a.kind === 'star' ? a.temperature : 28_000;
+      // Catalogue index 25822 is Betelgeuse; keep this experiment off every other star.
+      const betelgeuseConvection = d.id === 's25822-star';
       this.surfaceMat = new ShaderMaterial({
         vertexShader: Shaders.surfaceVert,
         fragmentShader: Shaders.starFrag,
+        defines: betelgeuseConvection ? { BETELGEUSE_CONVECTION: 1 } : {},
         uniforms: { ...baseUniforms, uTemperature: { value: T }, uIntensity: { value: a.kind === 'pulsar' ? 1.8 : 0.75 },
-          uDrift: { value: new Vector3() }, uMotionStrength: { value: 0 }, uColorWarmth: { value: 0 } },
+          uDrift: { value: new Vector3() }, uMotionStrength: { value: 0 }, uColorWarmth: { value: 0 },
+          ...(betelgeuseConvection ? { uConvectionPhase: { value: new Vector3() } } : {}) },
       });
       // Corona billboard, tinted by the photosphere temperature
       const [cr, cg, cb] = temperatureToRgb(T);
@@ -537,7 +541,14 @@ export class BodyView {
         lit.uRing.value.set(0, 0, 0, 0);
       }
     }
-    if (this.surfaceMat) this.surfaceMat.uniforms.uTime.value = time;
+    if (this.surfaceMat) {
+      this.surfaceMat.uniforms.uTime.value = time;
+      const phase = this.surfaceMat.uniforms.uConvectionPhase;
+      if (phase) {
+        const seconds = Date.now() * 0.001;
+        (phase.value as Vector3).set(Math.cos(seconds * 0.035), Math.sin(seconds * 0.035), Math.sin(seconds * 0.061));
+      }
+    }
     if (this.cloudsMat && b.data.clouds) {
       this.cloudsMat.uniforms.uTime.value = time;
       // smoothstep on the fade so the deck thins gently at both ends of the transition
