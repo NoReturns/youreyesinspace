@@ -7,7 +7,7 @@ uniform float uIntensity;
 uniform vec3 uDrift;
 uniform float uMotionStrength;
 uniform float uColorWarmth;
-#ifdef BETELGEUSE_CONVECTION
+#if defined(BETELGEUSE_CONVECTION) || defined(WOH_G64_CONVECTION)
 uniform vec3 uConvectionPhase;
 #endif
 
@@ -25,7 +25,24 @@ void main() {
 
   float cells;
   float gran;
-#ifdef BETELGEUSE_CONVECTION
+#if defined(BETELGEUSE_CONVECTION) || defined(WOH_G64_CONVECTION)
+#ifdef WOH_G64_CONVECTION
+  // Large, slowly morphing cells. An anchored warp roughens their boundaries.
+  vec3 warp = vec3(
+    snoise(p * 3.6 + vec3(uSeed * 0.11, 2.3, 7.1)),
+    snoise(p * 3.6 + vec3(5.7, uSeed * 0.09, 1.4)),
+    snoise(p * 3.6 + vec3(8.2, 3.8, uSeed * 0.07)));
+  vec3 q = normalize(p + 0.16 * warp);
+  float broadA = snoise(q * 1.25 + vec3(uSeed * 0.13, 4.1, 9.7));
+  float broadB = snoise(q * 1.25 + vec3(7.3, uSeed * 0.17, 15.1));
+  float convection = broadA * uConvectionPhase.x + broadB * uConvectionPhase.y;
+  float boundary = snoise(p * 6.8 + vec3(uConvectionPhase.xy * 0.24, uConvectionPhase.z * 0.3));
+  float lanes = 1.0 - smoothstep(0.04, 0.26, abs(convection + boundary * 0.18));
+  float fine = snoise(p * 8.0 + vec3(uConvectionPhase.xy * 0.35, uConvectionPhase.z * 0.3));
+  float micro = snoise(p * 24.0 + uSeed * 0.31);
+  cells = 0.5 + 0.5 * convection;
+  gran = clamp(0.78 + 0.50 * convection - 0.25 * lanes + 0.09 * fine + 0.025 * micro, 0.25, 1.35);
+#else
   // Two anchored, large-scale fields morph into one another; boundaries reshape
   // without dragging the entire photosphere across the sphere.
   float broadA = snoise(p * 2.4 + vec3(uSeed * 0.13, 4.1, 9.7));
@@ -36,6 +53,7 @@ void main() {
   float micro = snoise(p * 36.0 + uSeed * 0.31);
   cells = 0.5 + 0.5 * convection;
   gran = clamp(0.83 + 0.32 * convection - 0.19 * lanes + 0.08 * fine + 0.025 * micro, 0.34, 1.2);
+#endif
 #else
   // Granulation: multi-scale animated noise
   float t = uTime * 0.05;
@@ -75,6 +93,11 @@ void main() {
   color *= vec3(1.0, 1.0 - 0.6 * uColorWarmth, 1.0 - 0.7 * uColorWarmth);
 #ifdef BETELGEUSE_CONVECTION
   color *= vec3(1.0, 0.72, 0.52);
+#endif
+#ifdef WOH_G64_CONVECTION
+  // Cooler cell interiors and hotter edges change hue with the convection field.
+  float warmth = smoothstep(-0.65, 0.65, convection + fine * 0.12);
+  color *= mix(vec3(1.0, 0.43, 0.24), vec3(1.0, 0.78, 0.49), warmth);
 #endif
 
   // Hotter photospheres are brighter per unit area (kept mild: tone mapping would clip anyway)

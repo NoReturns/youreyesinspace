@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>WOH G64 visual audit</title><style>
+body { margin: 0; background: #0b0d14; color: #eee; font: 18px sans-serif; }
+header { padding: 14px 24px; }
+#labels { display: grid; grid-template-columns: repeat(3, 1fr); width: 1500px; }
+#labels span { text-align: center; }
+canvas { display: block; }
+</style></head>
+<body><header>Fixed camera, fixed exposure: <span id="status">loading</span></header>
+<div id="labels"><span>WOH G64</span><span>Betelgeuse</span><span>Sun control</span></div>
+<script type="module" src="/src/dev/woh-g64-audit.ts"></script></body>
+</html>

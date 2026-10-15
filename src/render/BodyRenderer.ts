@@ -12,6 +12,7 @@ import { temperatureToRgb } from '../astro/stellar';
 import { IMAGERY } from '../data/imagery';
 import { reachImagery, type ReachVisualAssets } from '../reach/ReachVisualAssets';
 import { Shaders } from './shaders';
+import { stellarConvection, setStellarConvectionPhase } from './StellarConvection';
 import { TileGlobe } from './TileGlobe';
 import { buildProceduralShip, disposeGroup } from './ProceduralShips';
 
@@ -168,15 +169,15 @@ export class BodyView {
     if (a.kind === 'star' || a.kind === 'pulsar') {
       // neutron stars: million-kelvin surface → render as a blue-white star
       const T = a.kind === 'star' ? a.temperature : 28_000;
-      // Catalogue index 25822 is Betelgeuse; keep this experiment off every other star.
-      const betelgeuseConvection = d.id === 's25822-star';
+      const convection = stellarConvection(d.id);
       this.surfaceMat = new ShaderMaterial({
         vertexShader: Shaders.surfaceVert,
         fragmentShader: Shaders.starFrag,
-        defines: betelgeuseConvection ? { BETELGEUSE_CONVECTION: 1 } : {},
+        defines: convection === 'betelgeuse' ? { BETELGEUSE_CONVECTION: 1 }
+          : convection === 'woh-g64' ? { WOH_G64_CONVECTION: 1 } : {},
         uniforms: { ...baseUniforms, uTemperature: { value: T }, uIntensity: { value: a.kind === 'pulsar' ? 1.8 : 0.75 },
           uDrift: { value: new Vector3() }, uMotionStrength: { value: 0 }, uColorWarmth: { value: 0 },
-          ...(betelgeuseConvection ? { uConvectionPhase: { value: new Vector3() } } : {}) },
+          ...(convection ? { uConvectionPhase: { value: new Vector3() } } : {}) },
       });
       // Corona billboard, tinted by the photosphere temperature
       const [cr, cg, cb] = temperatureToRgb(T);
@@ -185,6 +186,7 @@ export class BodyView {
       this.coronaMat = new ShaderMaterial({
         vertexShader: Shaders.billboardVert,
         fragmentShader: Shaders.coronaFrag,
+        defines: convection === 'woh-g64' ? { WOH_G64_DUST: 1 } : {},
         uniforms: {
           uTime: { value: 0 },
           uDrift: { value: new Vector3() },
@@ -546,7 +548,7 @@ export class BodyView {
       const phase = this.surfaceMat.uniforms.uConvectionPhase;
       if (phase) {
         const seconds = Date.now() * 0.001;
-        (phase.value as Vector3).set(Math.cos(seconds * 0.035), Math.sin(seconds * 0.035), Math.sin(seconds * 0.061));
+        setStellarConvectionPhase(stellarConvection(b.data.id)!, seconds, phase.value as Vector3);
       }
     }
     if (this.cloudsMat && b.data.clouds) {
