@@ -6,6 +6,7 @@ import { StarSystem } from '../core/StarSystem';
 import type { TimeSystem } from '../core/TimeSystem';
 import type { Universe } from '../core/Universe';
 import { SOLAR_SYSTEM } from '../data/solarSystem';
+import { LANDMARKS } from '../data/landmarks';
 import {
   REACH_ITINERARY_ID, REACH_ITINERARY_VERSION,
   nextReachStopId, previousReachStopId, reachStopIdsForVersion, V5_STOP_IDS, type ReachDirection,
@@ -102,6 +103,19 @@ export function reachPreviewRoute(id: string): ReachRoute | null {
   if (id === 'proxima') return {
     id: 'preview:proxima', version: 1, stops: REACH_PROXIMA_PILOT.stops, repeat: false,
   };
+  if (id === 'betelgeuse' || id === 'woh-g64') {
+    const landmarkIndex = id === 'woh-g64' ? LANDMARKS.findIndex((entry) => entry.id === 'l-wohg64') : -1;
+    if (id === 'woh-g64' && (landmarkIndex < 0 || !LANDMARKS[landmarkIndex].star)) return null;
+    const starId = id === 'betelgeuse' ? 'c25822' : `l${landmarkIndex}`;
+    return { id: `preview:${id}`, version: 1, repeat: false,
+      stops: [REACH_ITINERARY[0], {
+        id: `star:${starId}`, profile: 'star', label: id === 'betelgeuse' ? 'Betelgeuse' : 'WOH G64',
+        ref: { kind: 'star', starId },
+        starPresentation: { observationDistanceRadii: REACH_NEARBY_OBSERVATION_RADII,
+          surfaceMotion: 0, coronaMotion: 0, colorWarmth: 0 },
+      }],
+    };
+  }
   const nearby = Object.prototype.hasOwnProperty.call(REACH_NEARBY_STAR_PREVIEWS, id)
     ? REACH_NEARBY_STAR_PREVIEWS[id as keyof typeof REACH_NEARBY_STAR_PREVIEWS] : null;
   if (nearby) {

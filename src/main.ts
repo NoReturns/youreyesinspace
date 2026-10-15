@@ -26,6 +26,7 @@ import { CameraController } from './camera/CameraController';
 import { ReachVoyageDirector, REACH_ALPHA_DESTINATION_ID, REACH_PRODUCTION_ROUTE, reachPreviewRoute } from './reach/ReachVoyageDirector';
 import { destinationRef, reachPilotStarAppearance, reachStarVisualDrift, REACH_PROXIMA_PILOT } from './reach/ReachDestinations';
 import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
+import { ReachScaleComparison, scalePreviewEnabled } from './reach/ReachScaleComparison';
 import { ReachOdometerOverlay, readOdometerContract } from './reach/ReachOdometer';
 import { ReachPanoramaSync, readReachPanorama } from './reach/ReachPanorama';
 import { LocalStorageReachJourneyStore, REACH_PROXIMA_PILOT_KEY, inspectReachJourneyStore, saveReachJourney, type ReachJourneyState, type ReachJourneyStore } from './reach/JourneyState';
@@ -120,6 +121,7 @@ class App implements UIHost {
   private readonly surfacePreview: PerseveranceSurfacePreview | null;
   private readonly reachCountdown: ReachCountdownOverlay | null;
   private readonly reachOdometer: ReachOdometerOverlay | null;
+  private readonly reachScale: ReachScaleComparison | null;
   private alphaMarkers: HTMLDivElement[] = [];
   private alphaDiagnostics: HTMLPreElement | null = null;
   private readonly panorama = REACH_MODE ? readReachPanorama() : null;
@@ -254,6 +256,9 @@ class App implements UIHost {
       REACH_MODE ? readReachVisualAssets() : undefined);
     this.points = new BodyPoints(scene);
     this.overlay = new Overlay(overlayCanvas);
+    this.reachScale = scalePreviewEnabled(import.meta.env.DEV, REACH_MODE, REACH_PREVIEW_ID,
+      new URLSearchParams(window.location.search).get('reachScale'), this.panorama?.isPrimaryDisplay !== false)
+      ? new ReachScaleComparison(overlayCanvas) : null;
     this.input = new Input(sceneCanvas, !REACH_MODE);
     this.camera = new CameraController(this.universe);
     this.trajectories = new TrajectoryLines(scene);
@@ -1630,6 +1635,9 @@ class App implements UIHost {
       }
     }
     this.overlay.draw(this.bodies.views, eng.camera, this.selected, namedStars, starSel, this.uiVisible, s.galaxies ? this.galaxySprites.named : [], this.blackHoleMarkers(camPos), this.landmarkSprites.named, pin.visible ? pin : null);
+    if (this.reachScale && this.reach?.terminalObservation
+      && visualDestinationId === REACH_PREVIEW_ROUTE?.stops[1]?.id && starView)
+      this.reachScale.draw(starView, eng.camera, eng.width, eng.height, this.overlay.dpr);
     const selDist = this.selected ? this.bodies.byId.get(this.selected.id)?.distance ?? 0 : 0;
     if (!REACH_MODE) this.ui.update(now, dt, selDist);
     if (this.arrivalTrace && this.universe.current.starId === 'c64548') {
