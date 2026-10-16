@@ -395,6 +395,7 @@ class App implements UIHost {
         countdown: document.getElementById('reach-countdown') !== null,
         viewport: [this.engine.width, this.engine.height],
         viewOffset: this.engine.camera.view,
+        compositionShiftX: this.compositionShiftX,
         projection: this.engine.camera.projectionMatrix.elements,
         canvas: [this.engine.renderer.domElement.width, this.engine.renderer.domElement.height],
         contract: this.panorama,

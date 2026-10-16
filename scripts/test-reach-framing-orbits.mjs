@@ -5,7 +5,7 @@ import { rolldown } from 'rolldown';
 import * as THREE from 'three';
 
 const entry = `
-  export { applyPanoramaView, reachCompositionTarget } from './src/reach/ReachPanorama.ts';
+  export { applyPanoramaView, reachCompositionTarget, ReachPanoramaSync } from './src/reach/ReachPanorama.ts';
   export { OrbitLines } from './src/render/OrbitLines.ts';
   export { Universe } from './src/core/Universe.ts';
   export { StarCatalog } from './src/data/StarCatalog.ts';
@@ -35,7 +35,7 @@ new Function('require', 'module', 'exports', output.output[0].code)(
   (id) => id === 'three' ? THREE : { _: (text) => text, fixed: String, localeTag: () => 'en' },
   module, module.exports,
 );
-const { applyPanoramaView, reachCompositionTarget, OrbitLines, Universe, StarCatalog,
+const { applyPanoramaView, reachCompositionTarget, ReachPanoramaSync, OrbitLines, Universe, StarCatalog,
   TimeSystem, CameraController, ReachVoyageDirector, reachPreviewRoute, ReachTiming } = module.exports;
 const bin = readFileSync('public/data/stars.bin');
 const names = JSON.parse(readFileSync('public/data/star-names.json', 'utf8'));
@@ -143,3 +143,33 @@ for (const [phase, distance] of [
 }
 orbits.update(sun.position.clone(), false, false, 1544, () => 0, null, true);
 assert.ok(orbits.lines.every((line) => !line.line.visible), 'system gate still hides all lines');
+
+const channels = new Map();
+globalThis.window = { addEventListener() {} };
+globalThis.BroadcastChannel = class {
+  constructor(name) {
+    this.name = name;
+    const peers = channels.get(name) ?? [];
+    peers.push(this);
+    channels.set(name, peers);
+  }
+  postMessage(data) {
+    for (const peer of channels.get(this.name)) if (peer !== this) peer.onmessage?.({ data });
+  }
+  close() {}
+};
+const sessionId = 'a'.repeat(32);
+const leader = new ReachPanoramaSync({ sessionId, isPrimaryDisplay: true });
+const followers = [0, 1].map(() => new ReachPanoramaSync({ sessionId, isPrimaryDisplay: false }));
+const frame = {
+  jd: 2451545, rate: 1, paused: false, starId: 'c123',
+  position: [0, 0, 0], orientation: [0, 0, 0, 1],
+  referenceId: 'ref', targetId: 'target', destinationId: 'sirius',
+  phase: 'CRUISE', secondsLeft: 3, compositionShiftX: 1216,
+};
+leader.publish(frame);
+assert.equal(leader.sentSequence, 0);
+assert.deepEqual(followers.map((follower) => follower.latest?.compositionShiftX), [1216, 1216]);
+leader.publish({ ...frame, compositionShiftX: 704 });
+assert.deepEqual(followers.map((follower) => follower.latest?.compositionShiftX), [704, 704]);
+console.log('PASS panorama followers receive each shared composition shift');
