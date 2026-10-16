@@ -4,8 +4,7 @@ import { resolve } from 'node:path';
 
 /**
  * Build id stamped into asset URLs that are not content-hashed by Vite (/data, /models).
- * Lets nginx/Cloudflare serve them with a one-year immutable cache while a new deploy
- * still busts the cache.
+ * Keeps static asset URLs distinct between builds, including offline Reach bundles.
  */
 const BUILD_ID = process.env.BUILD_ID ?? Date.now().toString(36);
 const reachPackage = process.env.REACH_PACKAGE === '1';
@@ -48,7 +47,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    // production: no source maps (smaller upload, no source disclosure)
+    // release build: no source maps (smaller bundle, no source disclosure)
     sourcemap: false,
   },
   assetsInclude: ['**/*.glsl'],

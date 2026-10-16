@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "description": "Your Eyes In Space — a web-native universe explorer: Solar System to the edge of the observable universe",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/berkcomba/youreyesinspace.git" },
-  "homepage": "https://youreyesinspace.com",
+  "repository": { "type": "git", "url": "https://github.com/NoReturns/youreyesinspace.git" },
+  "homepage": "https://github.com/NoReturns/youreyesinspace",
   "type": "module",
   "scripts": {
     "dev": "vite",

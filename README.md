@@ -1,6 +1,6 @@
 # Your Eyes In Space
 
-**[youreyesinspace.com](https://youreyesinspace.com)** — a Space Engine–style universe explorer that
+**Original project: [Your Eyes In Space](https://youreyesinspace.com).** A Space Engine–style universe explorer that
 runs in the browser. Fly seamlessly from the Solar System to the edge of the observable universe
 (13.8 Gpc); real star/galaxy catalogues plus a deterministic procedural universe.
 Vite · TypeScript · Three.js. UI in English, Turkish, German, Spanish and French.
@@ -83,19 +83,12 @@ XAI_API_KEY=… node scripts/translate-tours.mjs            # draft de/es/fr/en 
 XAI_API_KEY=… node scripts/tts-tours.mjs --lang tr,en     # voice new/changed steps (skips unchanged ones)
 ```
 
-## Deployment
+## Local build and CI
 
-The app is static; in production it is served from `nginx:alpine` (`Dockerfile`, `deploy/nginx/*`:
-CSP and security headers, gzip, immutable caching, optional origin protection).
-
-- **CI/CD** — `.github/workflows/deploy.yml`: typecheck + build on every push/PR; on push to `main`,
-  Cloud Build builds the image and deploys to Cloud Run (Workload Identity Federation, keyless).
-  Setup: `deploy/github-cicd-setup.sh`.
-- **Manual** — `GCP_PROJECT=<project> ./deploy/cloudrun-deploy.sh`
-- **Domain / Cloudflare** — `deploy/cloudflare.md`
-
-Secrets (`ORIGIN_AUTH_SECRET`, `CF_API_TOKEN`, …) are provided only via environment variables /
-GitHub Secrets and are never committed.
+The application builds to static `dist/` with `npm run build`. The fork's
+`.github/workflows/ci.yml` runs typecheck and build only. No production hosting
+or deployment automation is configured in this checkout. Only the human owner
+may publish branches, tags, releases, or deployments.
 
 ## Architecture (short)
 
