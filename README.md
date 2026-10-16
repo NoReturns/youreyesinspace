@@ -2,7 +2,12 @@
 
 ## The Reach Screensaver integration
 
-The `reach-v1-release` branch also supplies the offline web bundle for
+This repository is NoReturns' fork of [*Your Eyes In Space*](https://github.com/berkcomba/youreyesinspace),
+the MIT-licensed open-source rendering engine by Berk Comba / BigBrains. The
+Reach is independently maintained; the original author and BigBrains are not
+presented as endorsing this fork.
+
+The `reach-v1-release` branch supplies the offline web bundle for
 [The Reach Screensaver](https://github.com/NoReturns/TheReachScreensaver). The
 Windows host is maintained in a separate repository. Reach mode is a passive
 64-stop itinerary from Earth through the Solar System and stars to WOH G64,
@@ -17,15 +22,19 @@ a fixed `BUILD_ID`, then follow the host repository's
 for the complete offline package and required notices. This repository's npm
 package version identifies the upstream web project; it is not the Windows
 screensaver release version. Only the human owner may publish this branch or
-promote it to
-`main`; the local cleanup removes the inherited deployment workflow.
+promote it to `main`. The inherited deployment workflow has been removed from
+this local branch.
 
 **Original project: [Your Eyes In Space](https://youreyesinspace.com).** A Space Engine–style universe explorer that
 runs in the browser. Fly seamlessly from the Solar System to the edge of the observable universe
 (13.8 Gpc); real star/galaxy catalogues plus a deterministic procedural universe.
 Vite · TypeScript · Three.js. UI in English, Turkish, German, Spanish and French.
 
-## Features
+## Interactive explorer features
+
+The following features describe the interactive browser explorer. The Windows
+screensaver uses its passive Reach itinerary and does not expose these flight
+controls or tours during playback.
 
 - **Solar System** — planets, dwarf planets, moons and comets from NASA/JPL Keplerian elements;
   procedural surface/atmosphere/cloud/ring shaders, eclipse and ring shadows.
@@ -126,8 +135,9 @@ src/i18n      Translation runtime and dictionaries
 
 ## License
 
-Code: [MIT](LICENSE). See [NOTICE.md](NOTICE.md) for the licences of data, models and streamed imagery
-(the HYG-derived catalogue is **CC BY-SA 4.0**; NASA content is public domain). The name "Your Eyes In
+Code: [MIT](LICENSE). See [NOTICE.md](NOTICE.md) for the licences and source-specific terms of data,
+models and streamed imagery (the HYG-derived catalogue is **CC BY-SA 4.0**). The name "Your Eyes In
 Space" and the logo are trademarks of BigBrains; forks should use their own name and logo.
 
-Your Eyes In Space is a [BigBrains](https://bigbrains.com.tr) product.
+The original Your Eyes In Space project is a [BigBrains](https://bigbrains.com.tr)
+product. The Reach fork is maintained separately by NoReturns.
