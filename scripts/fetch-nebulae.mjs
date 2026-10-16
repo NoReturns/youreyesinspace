@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 const OUT = 'public/nebulae';
 const SIZE = 512;
-const UA = 'YourEyesInSpace/0.3 (https://youreyesinspace.com; asset pipeline)';
+const UA = 'ReachFork/1.0 (https://github.com/NoReturns/youreyesinspace; asset pipeline)';
 
 /** id → Commons file title (without "File:") */
 const FILES = {

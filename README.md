@@ -16,11 +16,11 @@ a fixed `BUILD_ID`, then follow the host repository's
 [source build guide](https://github.com/NoReturns/TheReachScreensaver/blob/main/BUILD_FROM_SOURCE.md)
 for the complete offline package and required notices. This repository's npm
 package version identifies the upstream web project; it is not the Windows
-screensaver release version. A push to this repository's `main` triggers its
-Cloud Run deployment workflow, so release branch promotion requires a separate
-owner decision.
+screensaver release version. Only the human owner may publish this branch or
+promote it to
+`main`; the local cleanup removes the inherited deployment workflow.
 
-**[youreyesinspace.com](https://youreyesinspace.com)** — a Space Engine–style universe explorer that
+**Original project: [Your Eyes In Space](https://youreyesinspace.com).** A Space Engine–style universe explorer that
 runs in the browser. Fly seamlessly from the Solar System to the edge of the observable universe
 (13.8 Gpc); real star/galaxy catalogues plus a deterministic procedural universe.
 Vite · TypeScript · Three.js. UI in English, Turkish, German, Spanish and French.
@@ -103,19 +103,12 @@ XAI_API_KEY=… node scripts/translate-tours.mjs            # draft de/es/fr/en 
 XAI_API_KEY=… node scripts/tts-tours.mjs --lang tr,en     # voice new/changed steps (skips unchanged ones)
 ```
 
-## Deployment
+## Local build and CI
 
-The app is static; in production it is served from `nginx:alpine` (`Dockerfile`, `deploy/nginx/*`:
-CSP and security headers, gzip, immutable caching, optional origin protection).
-
-- **CI/CD** — `.github/workflows/deploy.yml`: typecheck + build on every push/PR; on push to `main`,
-  Cloud Build builds the image and deploys to Cloud Run (Workload Identity Federation, keyless).
-  Setup: `deploy/github-cicd-setup.sh`.
-- **Manual** — `GCP_PROJECT=<project> ./deploy/cloudrun-deploy.sh`
-- **Domain / Cloudflare** — `deploy/cloudflare.md`
-
-Secrets (`ORIGIN_AUTH_SECRET`, `CF_API_TOKEN`, …) are provided only via environment variables /
-GitHub Secrets and are never committed.
+The application builds to static `dist/` with `npm run build`. The fork's
+`.github/workflows/ci.yml` runs typecheck and build only. No production hosting
+or deployment automation is configured in this checkout. Only the human owner
+may publish branches, tags, releases, or deployments.
 
 ## Architecture (short)
 

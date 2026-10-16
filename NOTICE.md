@@ -49,7 +49,7 @@ Loaded at runtime directly from NASA servers; see `src/data/imagery.ts`.
 
 * [three.js](https://threejs.org/) — MIT
 * [Vite](https://vite.dev/), [TypeScript](https://www.typescriptlang.org/) — MIT / Apache-2.0 (build-time only)
-* Production image: nginx (2-clause BSD), Node.js (MIT) — build-time only
+* Node.js — MIT (build-time only)
 
 ## Trademarks
 

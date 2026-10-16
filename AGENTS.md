@@ -31,9 +31,13 @@ builds or suites when the change warrants them. Inspect the application in a
 browser when visual appearance is an acceptance criterion. Automated checks
 do not establish owner visual acceptance.
 
-Do not commit, push, deploy, publish, or reset owner journey data without
-explicit authorization. Authorized pushes may trigger CI, deployment, or
-publication; inspect the actual workflow configuration before pushing.
+Only the human owner may write to a remote. Agents must never run `git push`,
+`git push --tags`, remote merges, `gh release create` or upload, cloud deployment
+commands, or any other remote-write action, even if a later request casually
+asks to publish. Agents may prepare local commits and checked commands for the
+owner to execute manually. This rule has no implied exceptions.
+
+Do not reset owner journey data without explicit authorization.
 
 Report changed files, executed validation and results, remaining risks, and
 unverified assumptions. Distinguish observed behavior from code findings
