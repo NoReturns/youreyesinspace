@@ -19,6 +19,7 @@ const entry = `
   export { LANDMARKS } from './src/data/landmarks.ts';
   export { ReachTiming, reachTravelKind, reachObserveKind } from './src/reach/ReachTiming.ts';
   export { reachInfoOpacity } from './src/reach/ReachInfoCard.ts';
+  export { formatVoyageDistance } from './src/reach/ReachOdometer.ts';
 `;
 const bundle = await rolldown({
   input: '\0reach-v4-test', transform: { define: { 'import.meta.env.DEV': 'false' } },
@@ -45,7 +46,8 @@ const { ReachVoyageDirector, REACH_ITINERARY, REACH_PRODUCTION_ROUTE, V4_STOP_ID
   reachStopIdsForVersion, ReachPanoramaSync,
   parseReachJourney, inspectReachJourneyStore, destinationRef, createAlphaCentauriPreviewSystem,
   ALPHA_SYSTEM_ID, ALPHA_A_INDEX, ALPHA_B_INDEX, CameraController, TimeSystem, Universe,
-  StarCatalog, LANDMARKS, ReachTiming, reachTravelKind, reachObserveKind, reachInfoOpacity } = module.exports;
+  StarCatalog, LANDMARKS, ReachTiming, reachTravelKind, reachObserveKind, reachInfoOpacity,
+  formatVoyageDistance } = module.exports;
 const bin = readFileSync('public/data/stars.bin');
 const names = JSON.parse(readFileSync('public/data/star-names.json', 'utf8'));
 const catalog = new StarCatalog(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength), names);
@@ -287,6 +289,14 @@ for (const state of binaryBoundarySaves.filter((item) => item.phase.shot === 'es
   }
 }
 console.log('PASS 64 destinations, reversed return, 126 legs, round-trip and odometer accounting');
+for (const fromId of ['ceres', 'triton']) {
+  const leg = departureSaves.find((saved) => saved.destinationId === fromId
+    && saved.direction === 'outbound')?.odometer.leg;
+  assert.ok(leg, `${fromId}: outbound Solar System leg exists`);
+  assert.match(formatVoyageDistance(leg.distanceKm), / AU$/,
+    `${fromId}: local leg distance stays in AU even if later cumulative history reaches LY`);
+}
+console.log('PASS Ceres and Pluto approach leg distances use AU');
 console.log('PASS production binary system, nine resumable shots in both directions');
 
 let stellarFlights = 0;

@@ -283,13 +283,13 @@ assert.ok(Math.abs(geometricLegKm(origin, earth.position, moon.position)
   - earth.position.distanceTo(moon.position)) < 1e-6);
 assert.equal(geometricLegKm(new Vector3(100, -20, 30), new Vector3(0, 0, 0), new Vector3(3, 4, 12)), 13);
 assert.equal(formatVoyageDistance(42.681 * 149_597_870.7), '42.681 AU');
-assert.equal(formatVoyageDistance(9.4607e12), '1 ly');
-assert.equal(formatVoyageDistance(9.4607e18), '1 Mly');
+assert.equal(formatVoyageDistance(9.4607e12), '1 LY');
+assert.equal(formatVoyageDistance(9.4607e18), '1 million LY');
 assert.match(formatVoyageDistance(9.4607e12 * 0.009), /AU$/);
-assert.match(formatVoyageDistance(9.4607e18 * 0.009), /ly$/);
+assert.match(formatVoyageDistance(9.4607e18 * 0.009), /LY$/);
 assert.match(formatVoyageDistance(0.00001 * 149_597_870.7), /km$/);
 assert.equal(formatVoyageDistance(1), '1 km');
-console.log('PASS geometric Solar System separation and adaptive km/AU/ly/Mly display');
+console.log('PASS geometric Solar System separation and adaptive km/AU/LY display');
 
 const measured = makeRun();
 const inFlight = until(measured, (s) => s.destinationId === 'moon'
@@ -382,7 +382,7 @@ const odometerElement = { dataset: {}, setAttribute() {}, textContent: '' };
 globalThis.document = { createElement: () => odometerElement, body: { appendChild() {} } };
 const odometerOverlay = new ReachOdometerOverlay(circuit.director, 'auto');
 odometerOverlay.update(0);
-assert.match(odometerElement.textContent, /^Distance Travelled: .*$/);
+assert.match(odometerElement.textContent, /^Distance Travelled: [^\n]+\nApprox Speed: 0 km\/s$/);
 assert.doesNotMatch(odometerElement.textContent, /Round-Trips/);
 assert.notEqual(odometerElement.dataset.position, resolveCountdownPosition('auto', circuit.director.countdown.routeIndex));
 globalThis.document = previousDocument;
@@ -483,7 +483,7 @@ const follower = new ReachPanoramaSync(right);
 assert.equal(follower.latest, null);
 const sharedFrame = { jd: 2460000, rate: 1, paused: false, starId: 'c0', position: [1, 2, 3],
   orientation: [0, Math.sin(Math.PI / 36), 0, Math.cos(Math.PI / 36)], referenceId: 'earth', targetId: 'earth',
-  destinationId: 'earth', phase: 'DEPART', secondsLeft: 8 };
+  destinationId: 'earth', phase: 'DEPART', secondsLeft: 8, compositionShiftX: 0 };
 leader.publish(sharedFrame);
 assert.equal(follower.latest?.sequence, 0);
 assert.deepEqual(follower.latest?.position, [1, 2, 3]);

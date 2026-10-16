@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import { AU_KM, C_KM_S, LIGHT_YEAR_KM } from '../core/constants';
+import { AU_KM, LIGHT_YEAR_KM } from '../core/constants';
 import type { ReachVoyageDirector } from './ReachVoyageDirector';
 import { COUNTDOWN_POSITIONS, resolveCountdownPosition, type CountdownPosition } from './ReachCountdownOverlay';
 
@@ -18,10 +18,6 @@ export interface ReachOdometerState {
 
 const MLY_KM = LIGHT_YEAR_KM * 1_000_000;
 const GLY_KM = LIGHT_YEAR_KM * 1_000_000_000;
-const KM_PER_H_FROM_KM_S = 3600;
-const ONE_PERCENT_C_KM_S = C_KM_S * 0.01;
-const MILLION_C_KM_S = C_KM_S * 1_000_000;
-const BILLION_C_KM_S = C_KM_S * 1_000_000_000;
 
 /** Centre-to-centre separation in one Sun-relative scene frame, sampled at departure. */
 export function geometricLegKm(origin: Vector3, source: Vector3, destination: Vector3): number {
@@ -59,48 +55,31 @@ export function formatVoyageDistance(km: number): string {
     const digits = km >= 1000 ? 0 : hudFractionDigits(km);
     return `${localeNumber(km, digits)} km`;
   }
-  if (km < 0.01 * LIGHT_YEAR_KM) {
+  if (km < 1000 * AU_KM) {
     const au = km / AU_KM;
     return `${localeNumber(au, astroFractionDigits(au))} AU`;
   }
-  if (km < 0.01 * MLY_KM) {
+  if (km < MLY_KM) {
     const ly = km / LIGHT_YEAR_KM;
-    return `${localeNumber(ly, astroFractionDigits(ly))} ly`;
+    return `${localeNumber(ly, astroFractionDigits(ly))} LY`;
   }
-  if (km < 0.01 * GLY_KM) {
+  if (km < GLY_KM) {
     const mly = km / MLY_KM;
-    return `${localeNumber(mly, astroFractionDigits(mly))} Mly`;
+    return `${localeNumber(mly, astroFractionDigits(mly))} million LY`;
   }
   const gly = km / GLY_KM;
-  return `${localeNumber(gly, astroFractionDigits(gly))} Gly`;
+  return `${localeNumber(gly, astroFractionDigits(gly))} billion LY`;
 }
 
 export function formatApproxSpeed(kmPerSecond: number): string {
-  const prefix = 'APPROX SPEED: ';
-  if (!Number.isFinite(kmPerSecond) || kmPerSecond <= 0) return `${prefix}0`;
-  if (kmPerSecond < 1) {
-    const kph = kmPerSecond * KM_PER_H_FROM_KM_S;
-    if (kph < 0.05) return `${prefix}< 0.1 km/h`;
-    return `${prefix}${localeNumber(kph, hudFractionDigits(kph))} km/h`;
-  }
-  if (kmPerSecond < ONE_PERCENT_C_KM_S) {
-    return `${prefix}${localeNumber(kmPerSecond, hudFractionDigits(kmPerSecond))} km/s`;
-  }
-  if (kmPerSecond < C_KM_S) {
-    const pct = (kmPerSecond / C_KM_S) * 100;
-    return `${prefix}${localeNumber(pct, hudFractionDigits(pct))}% c`;
-  }
-  if (kmPerSecond < MILLION_C_KM_S) {
-    const c = kmPerSecond / C_KM_S;
-    const digits = c >= 1000 ? 0 : c >= 10 ? 1 : c >= 1 ? 2 : hudFractionDigits(c);
-    return `${prefix}${localeNumber(c, digits)} c`;
-  }
-  if (kmPerSecond < BILLION_C_KM_S) {
-    const mc = kmPerSecond / MILLION_C_KM_S;
-    return `${prefix}${localeNumber(mc, hudFractionDigits(mc))} million c`;
-  }
-  const bc = kmPerSecond / BILLION_C_KM_S;
-  return `${prefix}${localeNumber(bc, hudFractionDigits(bc))} billion c`;
+  const prefix = 'Approx Speed: ';
+  if (!Number.isFinite(kmPerSecond) || kmPerSecond <= 0) return `${prefix}0 km/s`;
+  const unitKm = kmPerSecond >= LIGHT_YEAR_KM ? LIGHT_YEAR_KM
+    : kmPerSecond >= AU_KM ? AU_KM : 1;
+  const unit = unitKm === LIGHT_YEAR_KM ? 'LY/s' : unitKm === AU_KM ? 'AU/s' : 'km/s';
+  const value = kmPerSecond / unitKm;
+  if (value < 0.000001) return `${prefix}< 0.000001 ${unit}`;
+  return `${prefix}${localeNumber(value, hudFractionDigits(value))} ${unit}`;
 }
 
 /** @deprecated Use formatApproxSpeed */
@@ -160,17 +139,24 @@ export class ReachOdometerOverlay {
 
     const distanceLine = `Distance Travelled: ${formatVoyageDistance(this.director.distanceTravelledKm)}`;
     let speedLine = '';
-    if (countdown.phase === 'NEXT') {
-      const km = this.director.distanceTravelledKm;
-      if (this.lastDistanceSample >= 0 && now - this.lastDistanceTime >= MIN_SPEED_SAMPLE_S * 1000) {
-        const dt = (now - this.lastDistanceTime) / 1000;
-        const delta = km - this.lastDistanceSample;
-        if (dt > 0 && delta >= 0 && Number.isFinite(delta)) {
-          speedLine = formatApproxSpeed(delta / dt);
+    if (this.director.odometerStationary) {
+      speedLine = formatApproxSpeed(0);
+      this.resetSpeedSampling();
+    } else if (countdown.phase === 'NEXT') {
+      const km = this.director.activeLegDistanceKm;
+      if (km === null) {
+        this.resetSpeedSampling();
+      } else {
+        if (this.lastDistanceSample >= 0 && now - this.lastDistanceTime >= MIN_SPEED_SAMPLE_S * 1000) {
+          const dt = (now - this.lastDistanceTime) / 1000;
+          const delta = km - this.lastDistanceSample;
+          if (dt > 0 && delta >= 0 && Number.isFinite(delta)) {
+            speedLine = formatApproxSpeed(delta / dt);
+          }
         }
+        this.lastDistanceSample = km;
+        this.lastDistanceTime = now;
       }
-      this.lastDistanceSample = km;
-      this.lastDistanceTime = now;
     } else {
       this.resetSpeedSampling();
     }

@@ -248,6 +248,14 @@ export class ReachVoyageDirector {
     return this.completedKm + (this.leg?.distanceKm ?? 0) * progress;
   }
 
+  /** Cruise progress before adding the cumulative total, for a precise HUD speed sample. */
+  get activeLegDistanceKm(): number | null {
+    const flight = this.stage === 'cruise' ? this.camera.autopilot : null;
+    if (!flight || !this.leg || flight.duration <= 0) return null;
+    return this.leg.distanceKm * Math.min(1, Math.max(0, flight.t / flight.duration));
+  }
+  get odometerStationary(): boolean { return this.stage === 'observe' && !this.alpha; }
+
   get countdown(): { phase: 'NEXT' | 'DEPART' | 'CRUISE'; destinationId: string; routeIndex: number; secondsLeft: number } {
     if (this.alpha) return { phase: 'DEPART', destinationId: this.stops[this.stop].id,
       routeIndex: this.stop, secondsLeft: this.alpha.secondsLeft };
