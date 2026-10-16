@@ -1,5 +1,25 @@
 # Your Eyes In Space
 
+## The Reach Screensaver integration
+
+The `reach-v1-release` branch also supplies the offline web bundle for
+[The Reach Screensaver](https://github.com/NoReturns/TheReachScreensaver). The
+Windows host is maintained in a separate repository. Reach mode is a passive
+64-stop itinerary from Earth through the Solar System and stars to WOH G64,
+then back along the route (126 travel legs per round trip). It saves checkpoints
+and a cumulative odometer. On multiple displays, the primary view leads the
+voyage and secondary views follow adjoining panorama slices. The host owns
+Windows installation, Settings, Reset Trip, and the isolated preview.
+
+For the v1.1.0 Windows candidate, build this branch with `REACH_PACKAGE=1` and
+a fixed `BUILD_ID`, then follow the host repository's
+[source build guide](https://github.com/NoReturns/TheReachScreensaver/blob/main/BUILD_FROM_SOURCE.md)
+for the complete offline package and required notices. This repository's npm
+package version identifies the upstream web project; it is not the Windows
+screensaver release version. A push to this repository's `main` triggers its
+Cloud Run deployment workflow, so release branch promotion requires a separate
+owner decision.
+
 **[youreyesinspace.com](https://youreyesinspace.com)** — a Space Engine–style universe explorer that
 runs in the browser. Fly seamlessly from the Solar System to the edge of the observable universe
 (13.8 Gpc); real star/galaxy catalogues plus a deterministic procedural universe.

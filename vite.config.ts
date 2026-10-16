@@ -20,15 +20,20 @@ export default defineConfig({
     transformIndexHtml(html) {
       return html
         .replace(/<title>.*?<\/title>/, '<title>The Reach Screensaver</title>')
-        .replace(/^.*<meta name="description".*\r?\n/gm, '    <meta name="description" content="The Reach Screensaver: a 57-stop interstellar round trip." />\n')
+        .replace(/^.*<meta name="description".*\r?\n/gm, '    <meta name="description" content="The Reach Screensaver: a 64-stop interstellar round trip." />\n')
         .replace(/^.*(?:rel="canonical"|property="og:|name="twitter:|rel="icon"|rel="apple-touch-icon").*\r?\n/gm, '')
         .replace(/^.*<img class="brand-mark".*\r?\n/gm, '')
         .replace('<span class="brand-name">YOUR EYES IN SPACE</span>', '<span class="brand-name">THE REACH SCREENSAVER</span>')
         .replace(/^.*<span class="brand-version".*\r?\n/gm, '')
-        .replace(/^.*<a id="copyright".*\r?\n/gm, '');
+        .replace(/^.*<a id="copyright".*\r?\n/gm, '')
+        .replace(/^.*<p><span data-i18n>Your Eyes In Space bir.*\r?\n/gm,
+          '            <p>The Reach Screensaver is based on <a href="https://github.com/berkcomba/youreyesinspace">Your Eyes In Space</a> by Berk Comba / BigBrains. Its source is MIT licensed; see the bundled license and notice.</p>\n');
     },
     closeBundle() {
       for (const name of ['logo.png', 'logo-white.png', 'favicon.png', 'apple-touch-icon.png', 'og-image.jpg']) {
+        rmSync(resolve(reachOutputDir, name), { force: true });
+      }
+      for (const name of ['robots.txt', 'sitemap.xml']) {
         rmSync(resolve(reachOutputDir, name), { force: true });
       }
       for (const name of ['tours', 'tour-media']) {
