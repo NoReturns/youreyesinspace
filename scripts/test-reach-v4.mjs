@@ -631,7 +631,8 @@ leader.publish({ jd: alphaState.simulation.jd, rate: alphaState.simulation.rate,
   paused: false, starId: alphaState.frame.starId, position: alphaState.camera.position,
   orientation: alphaState.camera.orientation, referenceId: alphaState.camera.referenceId,
   targetId: alphaState.camera.targetId, destinationId: alphaState.destinationId,
-  phase: 'DEPART', secondsLeft: alphaState.phase.duration - alphaState.phase.elapsed });
+  phase: 'DEPART', secondsLeft: alphaState.phase.duration - alphaState.phase.elapsed,
+  compositionShiftX: 0 });
 assert.equal(follower.latest.starId, ALPHA_SYSTEM_ID);
 assert.equal(follower.latest.destinationId, 'alpha-centauri-ab');
 assert.deepEqual(follower.latest.position, alphaState.camera.position);

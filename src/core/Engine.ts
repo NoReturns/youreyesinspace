@@ -25,6 +25,7 @@ export class Engine {
   /** user render-resolution scale (1 = device pixels, capped) */
   renderScale = 1;
   private panorama: ReachPanoramaContract | null = null;
+  private compositionShiftX = 0;
   /** coarse-pointer devices (phones/tablets): cheaper defaults */
   readonly mobile = window.matchMedia('(pointer: coarse)').matches;
 
@@ -71,13 +72,22 @@ export class Engine {
     this.camera.aspect = this.width / this.height;
     if (this.panorama) {
       const view = this.panorama;
-      applyPanoramaView(this.camera, view);
+      applyPanoramaView(this.camera, view, this.compositionShiftX);
+    } else if (this.compositionShiftX !== 0) {
+      this.camera.setViewOffset(this.width, this.height, -this.compositionShiftX, 0, this.width, this.height);
     } else this.camera.updateProjectionMatrix();
   }
 
   setPanorama(contract: ReachPanoramaContract): void {
     this.panorama = contract;
     this.resize();
+  }
+
+  setCompositionShift(shiftX: number): void {
+    if (this.compositionShiftX === shiftX) return;
+    this.compositionShiftX = shiftX;
+    if (this.panorama) applyPanoramaView(this.camera, this.panorama, shiftX);
+    else this.camera.setViewOffset(this.width, this.height, -shiftX, 0, this.width, this.height);
   }
 
   get localVerticalFovRad(): number {

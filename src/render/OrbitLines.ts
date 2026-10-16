@@ -104,7 +104,7 @@ export class OrbitLines {
    */
   update(
     camPos: Vector3, visible: boolean, showMoons: boolean, pxPerRad: number,
-    apparent: (id: string) => number, selectedId: string | null,
+    apparent: (id: string) => number, selectedId: string | null, retainInside = false,
   ): void {
     for (const l of this.lines) {
       const b = l.body;
@@ -138,7 +138,10 @@ export class OrbitLines {
         continue;
       }
       // Camera inside (or near) this orbit: it would sweep across the whole sky → fade it out
-      const insideFade = selectedId === b.id ? 1 : Math.min(1, Math.max(0, (dParent / b.resolved.a - 0.9) / 0.6));
+      const distanceFade = selectedId === b.id ? 1 : Math.min(1, Math.max(0, (dParent / b.resolved.a - 0.9) / 0.6));
+      // Reach may observe an authored star from inside its planets' orbits. Keep
+      // their existing geometry softly visible instead of dropping the lines.
+      const insideFade = retainInside ? 0.18 + 0.82 * distanceFade : distanceFade;
       if (insideFade <= 0) {
         l.line.visible = false;
         continue;

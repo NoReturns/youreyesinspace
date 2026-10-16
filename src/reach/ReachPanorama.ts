@@ -30,6 +30,7 @@ export interface ReachPanoramaFrame {
   destinationId: string;
   phase: 'NEXT' | 'DEPART' | 'CRUISE';
   secondsLeft: number;
+  compositionShiftX: number;
 }
 
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -71,9 +72,20 @@ export function readReachPanorama(): ReachPanoramaContract | null {
   return parseReachPanorama(value);
 }
 
-export function applyPanoramaView(camera: PerspectiveCamera, view: ReachPanoramaContract): void {
+export function applyPanoramaView(camera: PerspectiveCamera, view: ReachPanoramaContract, shiftX = 0): void {
   camera.setViewOffset(view.totalPanoramaWidth, view.totalPanoramaHeight,
-    view.viewportOffsetX, view.viewportOffsetY, view.viewportWidth, view.viewportHeight);
+    view.viewportOffsetX - shiftX, view.viewportOffsetY, view.viewportWidth, view.viewportHeight);
+}
+
+/** Shift the shared image toward the primary display, with modest per-stop variation. */
+export function reachCompositionTarget(destinationId: string, primaryWidth: number,
+  primaryCenterX: number, panoramaWidth: number): number {
+  let hash = 2166136261;
+  for (let i = 0; i < destinationId.length; i++)
+    hash = Math.imul(hash ^ destinationId.charCodeAt(i), 16777619);
+  const variation = destinationId.startsWith('alpha:') || destinationId === 'alpha-centauri-ab'
+    ? 0 : ((hash >>> 0) % 3 - 1) * 0.1;
+  return primaryCenterX - panoramaWidth / 2 + variation * primaryWidth;
 }
 
 export function localPanoramaFovRad(fullFovDeg: number, view: ReachPanoramaContract): number {
@@ -93,7 +105,8 @@ function validFrame(value: unknown): value is ReachPanoramaFrame {
     || typeof value.referenceId !== 'string' || typeof value.targetId !== 'string'
     || typeof value.destinationId !== 'string'
     || !['NEXT', 'DEPART', 'CRUISE'].includes(value.phase as string)
-    || typeof value.secondsLeft !== 'number' || !Number.isFinite(value.secondsLeft)) return false;
+    || typeof value.secondsLeft !== 'number' || !Number.isFinite(value.secondsLeft)
+    || typeof value.compositionShiftX !== 'number' || !Number.isFinite(value.compositionShiftX)) return false;
   return true;
 }
 

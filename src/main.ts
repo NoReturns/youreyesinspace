@@ -29,7 +29,7 @@ import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCount
 import { ReachScaleComparison, scalePreviewEnabled } from './reach/ReachScaleComparison';
 import { ReachOdometerOverlay, readOdometerContract } from './reach/ReachOdometer';
 import { reachInfoOpacity, reachInfoPlacement, reachInfoTarget, type ReachInfoSide } from './reach/ReachInfoCard';
-import { ReachPanoramaSync, readReachPanorama } from './reach/ReachPanorama';
+import { ReachPanoramaSync, readReachPanorama, reachCompositionTarget } from './reach/ReachPanorama';
 import { LocalStorageReachJourneyStore, REACH_PROXIMA_PILOT_KEY, inspectReachJourneyStore, saveReachJourney, type ReachJourneyState, type ReachJourneyStore } from './reach/JourneyState';
 import { ReachTiming } from './reach/ReachTiming';
 import { ReachArrivalTrace } from './reach/ReachArrivalTrace';
@@ -130,6 +130,8 @@ class App implements UIHost {
   private readonly panorama = REACH_MODE ? readReachPanorama() : null;
   private readonly panoramaSync = this.panorama ? new ReachPanoramaSync(this.panorama) : null;
   private lastPanoramaSequence = -1;
+  private compositionShiftX = 0;
+  private compositionInitialized = false;
   private readonly reachStore: ReachJourneyStore | null = REACH_MODE && !REACH_FLICKER
     && (!REACH_PREVIEW_ROUTE || REACH_ROUND_TRIP_PREVIEW) && !REACH_SURFACE_PREVIEW && !REACH_INSPECT_ID
     && this.panorama?.isPrimaryDisplay !== false
@@ -1430,6 +1432,22 @@ class App implements UIHost {
       this.reach?.update(dt, this.time.paused);
     }
     const cameraMs = cameraStarted ? performance.now() - cameraStarted : 0;
+    if (this.reach || shared) {
+      if (shared) this.compositionShiftX = shared.compositionShiftX;
+      else {
+        const view = this.panorama;
+        const primaryWidth = view?.viewportWidth ?? eng.width;
+        const primaryCenter = view
+          ? view.viewportOffsetX + primaryWidth / 2 : eng.width / 2;
+        const target = reachCompositionTarget(this.reach!.countdown.destinationId,
+          primaryWidth, primaryCenter, view?.totalPanoramaWidth ?? eng.width);
+        this.compositionShiftX = this.compositionInitialized
+          ? this.compositionShiftX + (target - this.compositionShiftX) * (1 - Math.exp(-dt / 2))
+          : target;
+      }
+      this.compositionInitialized = true;
+      eng.setCompositionShift(this.compositionShiftX);
+    }
     if (this.reach && this.panoramaSync) {
       const countdown = this.reach.countdown;
       const position = this.camera.position;
@@ -1441,6 +1459,7 @@ class App implements UIHost {
         orientation: [orientation.x, orientation.y, orientation.z, orientation.w],
         referenceId: this.camera.reference!.id, targetId: this.reach.cameraTargetId,
         destinationId: countdown.destinationId, phase: countdown.phase, secondsLeft: countdown.secondsLeft,
+        compositionShiftX: this.compositionShiftX,
       });
     }
     if (this.reach && now - this.lastReachSave >= 30_000) this.checkpointReach();
@@ -1600,7 +1619,8 @@ class App implements UIHost {
     this.orbits.update(camPos, !(REACH_MODE && this.universe.current.starId === ALPHA_SYSTEM_ID)
       && !hideGeneratedBodies
       && (ov.orbits ?? (s.orbits || this.backdrop || this.backdropPending)),
-      ov.moonOrbits ?? s.moonOrbits, pxPerRad, (id) => this.bodies.byId.get(id)?.apparentRadiusPx ?? 0, this.selected?.id ?? null);
+      ov.moonOrbits ?? s.moonOrbits, pxPerRad, (id) => this.bodies.byId.get(id)?.apparentRadiusPx ?? 0,
+      this.selected?.id ?? null, REACH_MODE && this.universe.current.starId === 'c0');
     const orbitMs = orbitStarted ? performance.now() - orbitStarted : 0;
     this.trajectories.update(camPos, this.time.jd, this.missions.lookup, s.orbits, eng.width * eng.pixelRatio, eng.height * eng.pixelRatio);
     this.belts.update(this.time.t, sunRel, eng.pixelRatio, s.belts && !hideGeneratedBodies);
