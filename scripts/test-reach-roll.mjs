@@ -87,7 +87,8 @@ for (let cycle = 0; cycle < 4; cycle++) {
       'inbound', cycle)]++;
   }
 }
-assert.ok(distribution.every((count) => Math.abs(count - 112) < 28),
+const expectedPerOrientation = (REACH_ITINERARY.length - 1) * 2;
+assert.ok(distribution.every((count) => Math.abs(count - expectedPerOrientation) < 28),
   `four-way choices roughly balanced over repeated v4 legs: ${distribution}`);
 
 for (const [destination, target] of [['saturn', 0], ['venus', 1], ['mars', 2], ['uranus', 3]]) {

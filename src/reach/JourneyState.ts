@@ -5,7 +5,7 @@ import { ALPHA_A_INDEX, ALPHA_B_INDEX, ALPHA_BARY_ID, alphaShotSeconds } from '.
 
 export const REACH_JOURNEY_KEY = 'the-reach:journey:v1';
 export const REACH_ITINERARY_ID = 'solar-system-41';
-export const REACH_ITINERARY_VERSION = 6;
+export const REACH_ITINERARY_VERSION = 7;
 const EXPANDED_STOP_IDS = new Set(['iss', 'hubble', 'jwst', 'juno', 'newhorizons', 'parker']);
 /** Authored version 2 order, retained solely to validate and finish saved legs. */
 const V2_STOP_IDS = [
@@ -42,6 +42,13 @@ export const V6_STOP_IDS = [
   ...V5_STOP_IDS, 'star:c10818', 'star:c25822', 'star:c73646', 'star:c92866',
   'star:l3', 'star:l15', 'star:l17',
 ] as const;
+/** Seven visual destinations; preserve every v6 ID and its relative order. */
+export const V7_STOP_IDS = [
+  ...V6_STOP_IDS.slice(0, 57), 'star:c19796',
+  'star:c10818', 'l-pleiades', 'star:c25822', 'star:c73646', 'l-helix',
+  'star:c22577', 'l-m42', 'star:c92866', 'l-m1', 'star:l3',
+  'star:l15', 'l-30dor', 'star:l17',
+] as const;
 export type ReachDirection = 'outbound' | 'inbound';
 export function reachStopIdsForVersion(version: number): readonly string[] | null {
   if (version === 1) return V1_STOP_IDS;
@@ -50,6 +57,7 @@ export function reachStopIdsForVersion(version: number): readonly string[] | nul
   if (version === 4) return V4_STOP_IDS;
   if (version === 5) return V5_STOP_IDS;
   if (version === 6) return V6_STOP_IDS;
+  if (version === 7) return V7_STOP_IDS;
   return null;
 }
 export function previousReachStopId(version: number, destinationId: string): string | null {

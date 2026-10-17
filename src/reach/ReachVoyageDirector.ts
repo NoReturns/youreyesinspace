@@ -9,7 +9,7 @@ import { SOLAR_SYSTEM } from '../data/solarSystem';
 import { LANDMARKS } from '../data/landmarks';
 import {
   REACH_ITINERARY_ID, REACH_ITINERARY_VERSION,
-  nextReachStopId, previousReachStopId, reachStopIdsForVersion, V6_STOP_IDS, type ReachDirection,
+  nextReachStopId, previousReachStopId, reachStopIdsForVersion, V7_STOP_IDS, type ReachDirection,
   type JourneyPhase, type Quat, type ReachFlightState, type ReachJourneyState, type Vec3,
 } from './JourneyState';
 import { ReachTiming } from './ReachTiming';
@@ -33,6 +33,9 @@ const landmarkStar = (landmarkId: string, label: string): Stop => {
   if (index < 0) throw new Error(`Missing stellar landmark ${landmarkId}`);
   return nearbyStar(`star:l${index}`, `l${index}`, label);
 };
+const photographedLandmark = (id: string, label: string): Stop => ({
+  id, profile: 'landmark', label, ref: { kind: 'landmark', landmarkId: id },
+});
 
 // Route order and presentation profile only. Durations come from ReachTiming.
 export const REACH_ITINERARY: readonly Stop[] = [
@@ -94,18 +97,25 @@ export const REACH_ITINERARY: readonly Stop[] = [
   nearbyStar('star:c15247', 'c15247', 'Epsilon Eridani'),
   nearbyStar('star:c7458', 'c7458', 'Tau Ceti'),
   nearbyStar('star:c83130', 'c83130', 'Vega'),
+  nearbyStar('star:c19796', 'c19796', 'Aldebaran'),
   nearbyStar('star:c10818', 'c10818', 'Polaris'),
+  photographedLandmark('l-pleiades', 'Pleiades (M45)'),
   nearbyStar('star:c25822', 'c25822', 'Betelgeuse'),
   nearbyStar('star:c73646', 'c73646', 'Antares'),
+  photographedLandmark('l-helix', 'Helix Nebula (NGC 7293)'),
+  nearbyStar('star:c22577', 'c22577', 'Rigel'),
+  photographedLandmark('l-m42', 'Orion Nebula (M42)'),
   nearbyStar('star:c92866', 'c92866', 'Deneb'),
+  photographedLandmark('l-m1', 'Crab Nebula (M1)'),
   landmarkStar('l-etacar', 'Eta Carinae'),
   landmarkStar('l-r136a1', 'R136a1'),
+  photographedLandmark('l-30dor', 'Tarantula Nebula (30 Doradus)'),
   landmarkStar('l-wohg64', 'WOH G64'),
 ];
-if (REACH_ITINERARY.length !== V6_STOP_IDS.length
-  || new Set(REACH_ITINERARY.map((stop) => stop.id)).size !== V6_STOP_IDS.length
-  || REACH_ITINERARY.some((stop, index) => stop.id !== V6_STOP_IDS[index]))
-  throw new Error('Reach v6 itinerary identity or order mismatch');
+if (REACH_ITINERARY.length !== V7_STOP_IDS.length
+  || new Set(REACH_ITINERARY.map((stop) => stop.id)).size !== V7_STOP_IDS.length
+  || REACH_ITINERARY.some((stop, index) => stop.id !== V7_STOP_IDS[index]))
+  throw new Error('Reach v7 itinerary identity or order mismatch');
 
 export const REACH_PRODUCTION_ROUTE: ReachRoute = {
   id: REACH_ITINERARY_ID, version: REACH_ITINERARY_VERSION, stops: REACH_ITINERARY, repeat: true,
@@ -129,6 +139,10 @@ export function reachPreviewRoute(id: string): ReachRoute | null {
   if (id === 'tarantula') return { id: 'preview:tarantula', version: 1, repeat: true,
     stops: [REACH_ITINERARY[0], { id: 'l-30dor', profile: 'landmark', label: 'Tarantula Nebula (30 Doradus)',
       ref: { kind: 'landmark', landmarkId: 'l-30dor' } }],
+  };
+  if (id === 'nebula-transitions') return { id: 'preview:nebula-transitions', version: 1, repeat: true,
+    stops: [REACH_ITINERARY[0], ...['l-m42', 'l-m1', 'l-30dor'].map((stopId) =>
+      REACH_ITINERARY.find((stop) => stop.id === stopId)!)],
   };
   if (id === 'alpha-centauri') return REACH_ALPHA_CENTAURI_PREVIEW;
   if (id === 'proxima') return {
@@ -166,6 +180,8 @@ export function reachPreviewRoute(id: string): ReachRoute | null {
 }
 
 const OBSERVATION_ORBIT = 0.012;
+const PHOTOGRAPHIC_ORBIT_RADIANS = 30 * Math.PI / 180;
+const PHOTOGRAPHIC_STOPS = new Set(['l-pleiades', 'l-helix', 'l-m42', 'l-m1', 'l-30dor']);
 const MOON_FLYBY_RATE = 0.025;
 const MIN_SUNLIT_DOT = 0.2; // correct views with less than 60% of the disk visible
 const TARGET_SUNLIT_DOT = 0.6; // 80% of the disk visible
@@ -511,9 +527,24 @@ export class ReachVoyageDirector {
       this.onPhaseChange?.();
       return;
     }
+    const elapsed = this.observeDuration - this.observeLeft;
     this.observeLeft = Math.max(0, this.observeLeft - dt);
+    if (PHOTOGRAPHIC_STOPS.has(this.stops[this.stop].id))
+      this.updatePhotographicOrbit(elapsed, this.observeDuration - this.observeLeft);
     if (this.observeLeft <= 0 && (this.route.repeat || this.stop < this.stops.length - 1))
       this.beginDeparture(0, this.camera.autoOrbit);
+  }
+
+  private updatePhotographicOrbit(from: number, to: number): void {
+    const point = this.point(this.stops[this.stop]);
+    if (!point || this.observeDuration <= 0) return;
+    // Increment from saved elapsed time so a mid-observation checkpoint needs no new fields.
+    const angle = PHOTOGRAPHIC_ORBIT_RADIANS
+      * (smoothstep(to / this.observeDuration) - smoothstep(from / this.observeDuration));
+    const up = new Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).normalize();
+    const orbit = new Quaternion().setFromAxisAngle(up, angle);
+    this.camera.position.sub(point).applyQuaternion(orbit).add(point);
+    this.camera.quaternion.premultiply(orbit);
   }
 
   private updateFlyby(dt: number): void {

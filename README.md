@@ -9,9 +9,9 @@ presented as endorsing this fork.
 
 The `reach-v1-release` branch supplies the offline web bundle for
 [The Reach Screensaver](https://github.com/NoReturns/TheReachScreensaver). The
-Windows host is maintained in a separate repository. Reach mode is a passive
-64-stop itinerary from Earth through the Solar System and stars to WOH G64,
-then back along the route (126 travel legs per round trip). It saves checkpoints
+Windows host is maintained in a separate repository. The current Reach source has a passive
+71-stop itinerary from Earth through the Solar System and stars to WOH G64,
+then back along the route (140 travel legs per round trip). It saves checkpoints
 and a cumulative odometer. On multiple displays, the primary view leads the
 voyage and secondary views follow adjoining panorama slices. The host owns
 Windows installation, Settings, Reset Trip, and the isolated preview.

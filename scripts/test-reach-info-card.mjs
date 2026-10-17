@@ -74,13 +74,18 @@ assert.match(css, /body\.reach-mode #info \.info-head-btns,/);
 assert.match(css, /body\.reach-mode #info \{[\s\S]*?max-height: none; overflow-y: visible;/);
 
 const ui = readFileSync('src/ui/UI.ts', 'utf8');
+assert.equal(ui.split('Işık yolculuğu (kameradan)').length - 1, 7,
+  'all seven camera-relative light-time rows use the same label');
+assert.ok(!ui.includes('Işık yolculuğu (buradan)'), 'old camera-relative label removed');
+assert.equal(JSON.parse(readFileSync('src/i18n/locales/en/ui.json', 'utf8'))
+  ['Işık yolculuğu (kameradan)'], 'Light Travel Time (From Camera)');
 const cardLabels = [
   'Kameraya uzaklık', 'Güneş\'e uzaklık', 'Model uzaklığı (Güneş\'ten)',
   'Katalog uzaklığı (Dünya\'dan)', 'Görünür kadir (kameradan)',
   'Görünür kadir (Dünya\'dan)', 'Katalog görünür kadir (Dünya\'dan)',
   'Mutlak kadir', 'Açısal yarıçap (kameradan)', 'Görsel model yarıçapı',
   'Fiziksel çap (katalog)', 'Fiziksel boyut (katalog)', 'Model çapı',
-  'Işık yolculuğu (buradan)', 'Işık yolculuğu (Dünya\'dan)',
+  'Işık yolculuğu (kameradan)', 'Işık yolculuğu (Dünya\'dan)',
   'Fotoğraf: {source}. Üç boyutlu bulut görsel bir modeldir.',
 ];
 for (const label of cardLabels) {

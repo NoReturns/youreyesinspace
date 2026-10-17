@@ -637,7 +637,7 @@ export class UI {
     rows.push(['Parlaklık', `${lum.toExponential(2)} L☉`]);
     rows.push(['Yıldız sayısı (tahmini)', `~${(lum * 3).toExponential(1).replace('e+', '×10^')}`]);
     if (i < g.catalogCount && i !== 0) rows.push(['Kaynak', 'Messier / NGC (yaklaşık parametreler)']);
-    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (kameradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = g.model(i).p.description ?? '';
   }
@@ -667,7 +667,7 @@ export class UI {
       else if (k === 'Çap' || k === 'Boyut') rows.push([k === 'Çap' ? 'Fiziksel çap (katalog)' : 'Fiziksel boyut (katalog)', v]);
       else rows.push([k, v]);
     }
-    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (kameradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
     const photo = LANDMARK_IMAGES[d.id];
     this.infoDesc.textContent = `${d.description} ${photo
@@ -714,7 +714,7 @@ export class UI {
     const moons = sys.bodies.filter((b) => b.data.type === 'moon').length;
     rows.push(['Gezegenler', planets ? `${planets}${moons ? ` ${_('(+{n} uydu)', { n: moons })}` : ''}` : 'Yok']);
     if (sys.belts.length) rows.push(['Kuşaklar', sys.belts.map((b) => _(b.name)).join(', ')]);
-    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (kameradan)', fmtDuration(camDist / 299_792.458)]);
 
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = isProc
@@ -796,7 +796,7 @@ export class UI {
     }
     if (b.parent && camDist > 0) {
       const lightTime = camDist / 299_792.458;
-      rows.push(['Işık yolculuğu (buradan)', fmtDuration(lightTime)]);
+      rows.push(['Işık yolculuğu (kameradan)', fmtDuration(lightTime)]);
     }
 
     this.infoBody.innerHTML = rowsHtml(rows);
@@ -822,7 +822,7 @@ export class UI {
       for (const c of comps) rows.push([_("{name}'ın yörünge yarıçapı", { name: c.name }), c.resolved!.a > AU_KM * 0.05 ? `${fixed(c.resolved!.a / AU_KM, 3)} AU` : fmtDistance(c.resolved!.a)]);
       rows.push(['Dış merkezlik', fixed(first.resolved.e, 3)]);
     }
-    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (kameradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = _('Çift sistemin ortak kütle merkezi: iki bileşen de bu görünmez noktanın etrafında, kütleleriyle ters orantılı yarıçaplarda ve her zaman karşılıklı konumlarda dolanır. Ağır bileşen küçük, hafif bileşen büyük bir yörünge çizer.');
   }
@@ -861,7 +861,7 @@ export class UI {
       rows.push('sep');
     }
     if (b.data.facts) for (const [k, v] of Object.entries(b.data.facts)) if (k !== 'Kütle') rows.push([k, v]);
-    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (kameradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = `${_(b.data.description ?? '')} ${_('Görüntü: Schwarzschild metriğinde ışık yollarının (null jeodezikler) ekran uzayında gerçek zamanlı izlenmesi; diskte Doppler ışıması ve kütleçekimsel kırmızıya kayma uygulanır.')}`;
   }
@@ -902,7 +902,7 @@ export class UI {
       rows.push('sep');
     }
     if (b.data.facts) for (const [k, v] of Object.entries(b.data.facts)) if (k !== 'Kütle' && k !== 'Periyot') rows.push([k, v]);
-    rows.push(['Işık yolculuğu (buradan)', fmtDuration(camDist / 299_792.458)]);
+    rows.push(['Işık yolculuğu (kameradan)', fmtDuration(camDist / 299_792.458)]);
     this.infoBody.innerHTML = rowsHtml(rows);
     this.infoDesc.textContent = `${_(b.data.description ?? '')} ${_('Görüntü: dönme ekseninden eğik manyetik eksen boyunca iki ışın konisi; koni her dönüşte bakış doğrultusunu süpürdüğünde parlaklık atar (deniz feneri etkisi). Işın geometrisi temsilîdir.')}`;
   }

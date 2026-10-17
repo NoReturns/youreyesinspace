@@ -52,15 +52,15 @@ assert.deepEqual(route.stops.map((stop) => stop.id), ['earth', 'l-30dor']);
 assert.equal(route.repeat, true);
 assert.deepEqual(destinationRef(route.stops[1]), { kind: 'landmark', landmarkId: 'l-30dor' });
 assert.equal(destinationSystem(route.stops[1]), 'c0');
-assert.equal(REACH_ITINERARY_VERSION, 6);
-assert.ok(!REACH_PRODUCTION_ROUTE.stops.some((stop) => stop.id === 'l-30dor'));
+assert.equal(REACH_ITINERARY_VERSION, 7);
+assert.ok(REACH_PRODUCTION_ROUTE.stops.some((stop) => stop.id === 'l-30dor'));
 assert.equal(reachPreviewRoute('unknown-landmark'), null);
 const input = { flush: () => ({ dx: 0, dy: 0, wheel: 0, pinch: 0, panX: 0, panY: 0 }),
   down: () => false };
 const fov = 50 * Math.PI / 180;
 const hasDestination = (universe) => (id) => {
-  if (id === 'l-30dor') return !!universe.landmark(id);
   const stop = route.stops.find((candidate) => candidate.id === id);
+  if (stop?.ref?.kind === 'landmark') return !!universe.landmark(id);
   if (stop?.ref?.kind === 'star') return !!universe.system(stop.ref.starId).star;
   return !!universe.get(id) || !!universe.system('c0').get(id);
 };
@@ -221,7 +221,7 @@ for (const [state, targetId, referenceId] of [
   primary.publish({ jd: state.simulation.jd, rate: state.simulation.rate, paused: false,
     starId: state.frame.starId, position: state.camera.position,
     orientation: state.camera.orientation, referenceId, targetId,
-    destinationId: state.destinationId, phase: 'DEPART', secondsLeft: 1 });
+    destinationId: state.destinationId, phase: 'DEPART', secondsLeft: 1, compositionShiftX: 0 });
   for (const follower of followers) {
     assert.equal(follower.latest.starId, state.frame.starId);
     assert.equal(follower.latest.targetId, targetId);
@@ -230,3 +230,19 @@ for (const [state, targetId, referenceId] of [
   }
 }
 console.log('PASS WOH G64 to Tarantula round trip repeats; seven checkpoint restores, frames, camera targets, card, and odometer');
+
+route = reachPreviewRoute('nebula-transitions');
+assert.deepEqual(route.stops.map((stop) => stop.id), ['earth', 'l-m42', 'l-m1', 'l-30dor']);
+assert.equal(route.repeat, true);
+const sequence = makeRun();
+for (const id of ['l-m42', 'l-m1', 'l-30dor']) {
+  for (const phase of ['cruise', 'observe', 'departure']) {
+    const state = until(sequence, (s) => s.destinationId === id
+      && s.phase.kind === phase && s.phase.elapsed > 0.5, 5000);
+    verifyResume(sequence, state, `${id} ${phase}`);
+  }
+}
+const loop = until(sequence, (s) => s.destinationId === 'l-m42'
+  && s.phase.kind === 'cruise' && s.odometer.completedKm > 0, 5000);
+assert.ok(loop.odometer.completedKm > 0);
+console.log('PASS continuous Orion, Crab, Tarantula approach, observation, departure, and repeat');
