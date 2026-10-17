@@ -23,7 +23,8 @@ import { Overlay, type StarSelectionScreen } from './render/Overlay';
 import type { NamedStarScreen } from './render/StarPoints';
 import { Input } from './input/Input';
 import { CameraController } from './camera/CameraController';
-import { ReachVoyageDirector, REACH_ALPHA_DESTINATION_ID, REACH_PRODUCTION_ROUTE, reachPreviewRoute } from './reach/ReachVoyageDirector';
+import { ReachVoyageDirector, REACH_ALPHA_DESTINATION_ID, REACH_PRODUCTION_ROUTE,
+  reachDestinationTestRoute, reachPreviewRoute } from './reach/ReachVoyageDirector';
 import { destinationRef, destinationSystem, reachPilotStarAppearance, reachStarVisualDrift, REACH_PROXIMA_PILOT } from './reach/ReachDestinations';
 import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
 import { ReachScaleComparison, scalePreviewEnabled } from './reach/ReachScaleComparison';
@@ -55,12 +56,29 @@ const IDENTITY = new Matrix3();
 const TOUR_HOP_S = 1.6;
 /** auto-orbit speed (rad/s) of the opening backdrop */
 const BACKDROP_ORBIT = 0.03;
-const REACH_MODE = new URLSearchParams(window.location.search).get('reach') === '1';
+const reachParams = new URLSearchParams(window.location.search);
+const REACH_MODE = reachParams.get('reach') === '1';
+const reachTestPreview = reachParams.get('reachPreview');
+const REACH_DESTINATION_TEST = REACH_MODE
+  && (import.meta.env.DEV || import.meta.env.VITE_REACH_DEV_TEST === '1')
+  && (reachTestPreview === 'pluto-to-sgra' || reachTestPreview === 'destination-jump')
+  && reachParams.get('reachTestStart') === 'departure';
+if (REACH_MODE && reachParams.has('reachTestStart')
+  && !REACH_DESTINATION_TEST) throw new Error('This bundle does not enable the requested destination test');
+const reachTestNumber = (name: string): number => {
+  const raw = reachParams.get(name);
+  return raw !== null && /^\d+$/.test(raw) ? Number(raw) : NaN;
+};
+const REACH_TEST_CRUISE_SECONDS = reachTestPreview === 'destination-jump'
+  ? reachTestNumber('reachTestCruise') : 8;
+if (REACH_DESTINATION_TEST && (!Number.isInteger(REACH_TEST_CRUISE_SECONDS)
+  || REACH_TEST_CRUISE_SECONDS < 2 || REACH_TEST_CRUISE_SECONDS > 120))
+  throw new Error('Destination test cruise duration must be 2 to 120 seconds');
 const REACH_FLICKER = import.meta.env.DEV && REACH_MODE
   && new URLSearchParams(window.location.search).get('reachFlicker') === '1';
 const REACH_PILOT = import.meta.env.DEV && REACH_MODE
   && new URLSearchParams(window.location.search).get('reachPilot') === 'proxima';
-const REACH_PREVIEW_ID = import.meta.env.DEV && REACH_MODE
+const REACH_PREVIEW_ID = (import.meta.env.DEV || REACH_DESTINATION_TEST) && REACH_MODE
   ? new URLSearchParams(window.location.search).get('reachPreview') : null;
 const REACH_INSPECT_ID = import.meta.env.DEV && REACH_MODE
   ? new URLSearchParams(window.location.search).get('reachInspect') : null;
@@ -70,8 +88,12 @@ const REACH_INSPECT_FIXTURES = new Set([
 ]);
 if (REACH_INSPECT_ID && !REACH_INSPECT_FIXTURES.has(REACH_INSPECT_ID))
   throw new Error(`Unknown Reach inspection checkpoint: ${REACH_INSPECT_ID}`);
-const REACH_PREVIEW_ROUTE = REACH_PREVIEW_ID ? reachPreviewRoute(REACH_PREVIEW_ID) : null;
-if (REACH_PREVIEW_ID && !REACH_PREVIEW_ROUTE) throw new Error(`Unknown Reach preview stop: ${REACH_PREVIEW_ID}`);
+const REACH_PREVIEW_ROUTE = REACH_DESTINATION_TEST && reachTestPreview === 'destination-jump'
+  ? reachDestinationTestRoute(reachTestNumber('reachTestFrom'), reachTestNumber('reachTestTo'))
+  : REACH_PREVIEW_ID ? reachPreviewRoute(REACH_PREVIEW_ID) : null;
+if (REACH_PREVIEW_ID && !REACH_PREVIEW_ROUTE)
+  throw new Error(REACH_DESTINATION_TEST ? 'Invalid or unsupported destination test route'
+    : `Unknown Reach preview stop: ${REACH_PREVIEW_ID}`);
 const REACH_ROUND_TRIP_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:woh-tarantula';
 const REACH_ALPHA_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:alpha-centauri';
 const REACH_SGRA_PREVIEW = REACH_PREVIEW_ROUTE?.id === 'preview:sgra';
@@ -124,6 +146,8 @@ class App implements UIHost {
   private readonly surfacePreview: PerseveranceSurfacePreview | null;
   private readonly reachCountdown: ReachCountdownOverlay | null;
   private readonly reachOdometer: ReachOdometerOverlay | null;
+  private reachTestStatus: HTMLDivElement | null = null;
+  private lastReachTestStatus = 0;
   private readonly reachScale: ReachScaleComparison | null;
   private alphaMarkers: HTMLDivElement[] = [];
   private alphaDiagnostics: HTMLPreElement | null = null;
@@ -231,7 +255,7 @@ class App implements UIHost {
       this.time.jd = savedJourney.simulation.jd;
       if (savedJourney.frame.starId !== this.universe.current.starId)
         this.universe.switchTo(savedJourney.frame.starId, this.time.jd, this.time.t);
-    } else if (REACH_ROUND_TRIP_PREVIEW || REACH_SGRA_PREVIEW) {
+    } else if (REACH_ROUND_TRIP_PREVIEW || REACH_SGRA_PREVIEW || REACH_DESTINATION_TEST) {
       this.universe.switchTo(destinationSystem(REACH_ROUTE.stops[0]), this.time.jd, this.time.t);
     }
     // Evaluate once so orbital elements exist before building renderers
@@ -320,8 +344,17 @@ class App implements UIHost {
       this.surfacePreview = null;
       this.ui.enableReachInfo();
       this.reach = new ReachVoyageDirector(this.universe, this.camera, this.time,
-        new ReachTiming(REACH_TIMING_MODE), savedJourney, () => this.checkpointReach(), REACH_ROUTE,
+        new ReachTiming(REACH_TIMING_MODE, Math.random,
+          REACH_DESTINATION_TEST ? REACH_TEST_CRUISE_SECONDS : undefined),
+        savedJourney, () => this.checkpointReach(), REACH_ROUTE,
         this.engine.camera.fov * Math.PI / 180);
+      if (REACH_DESTINATION_TEST) {
+        this.reach.startDeveloperDeparture();
+        this.reachTestStatus = document.createElement('div');
+        this.reachTestStatus.style.cssText = 'position:fixed;left:16px;top:16px;z-index:1000;' +
+          'padding:8px 12px;color:white;background:#000b;font:14px monospace;pointer-events:none';
+        document.body.appendChild(this.reachTestStatus);
+      }
       const countdown = readCountdownContract(true);
       this.reachCountdown = countdown ? new ReachCountdownOverlay(this.reach,
         REACH_ALPHA_PREVIEW ? 'top-centre' : countdown.position) : null;
@@ -1466,6 +1499,14 @@ class App implements UIHost {
     if (this.reach && now - this.lastReachSave >= 30_000) this.checkpointReach();
     this.reachCountdown?.update(now);
     this.reachOdometer?.update(now);
+    if (this.reachTestStatus && this.reach && now - this.lastReachTestStatus >= 250) {
+      this.lastReachTestStatus = now;
+      const state = this.reach.capture();
+      const destination = state.odometer?.leg?.toId ?? state.destinationId;
+      const label = REACH_ROUTE.stops.find((stop) => stop.id === destination)?.label ?? destination;
+      const source = REACH_ROUTE.stops[0].label ?? REACH_ROUTE.stops[0].id;
+      this.reachTestStatus.textContent = `TEST ${source} to ${label} | ${state.direction} | ${state.phase.kind}`;
+    }
     this.aimAtPin(dt, fovRad, eng.width / Math.max(1, eng.height));
     // backdrop bookkeeping: start circling once the return flight has arrived; any other flight
     // (or re-targeting) stops the auto-orbit, which ends the backdrop

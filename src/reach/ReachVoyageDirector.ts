@@ -126,8 +126,23 @@ export function reachLandmarkObservationDistance(radiusKm: number, verticalFovRa
   return radiusKm / (0.4 * Math.tan(verticalFovRad / 2));
 }
 
+/** A two-stop development route using authored itinerary entries and the normal voyage director. */
+export function reachDestinationTestRoute(fromIndex: number, toIndex: number): ReachRoute | null {
+  if (!Number.isSafeInteger(fromIndex) || !Number.isSafeInteger(toIndex)
+    || fromIndex < 0 || toIndex < 0 || fromIndex >= REACH_ITINERARY.length
+    || toIndex >= REACH_ITINERARY.length || fromIndex === toIndex) return null;
+  const from = REACH_ITINERARY[fromIndex];
+  if (destinationRef(from).kind === 'landmark') return null;
+  return { id: 'preview:destination-jump', version: 1, repeat: false,
+    stops: [from, REACH_ITINERARY[toIndex]] };
+}
+
 /** Development-only routes are isolated from the production itinerary. */
 export function reachPreviewRoute(id: string): ReachRoute | null {
+  if (id === 'pluto-to-sgra') return { id: 'preview:pluto-to-sgra', version: 1, repeat: false,
+    stops: [REACH_ITINERARY.find((stop) => stop.id === 'pluto')!,
+      { id: 'sgra', profile: 'star', label: 'Sagittarius A*',
+        ref: { kind: 'body', systemId: 'b0', bodyId: 'sgra' } }] };
   if (id === 'sgra') return { id: 'preview:sgra', version: 1, repeat: false,
     stops: [{ id: 'sgra', profile: 'star', label: 'Sagittarius A*',
       ref: { kind: 'body', systemId: 'b0', bodyId: 'sgra' } }] };
@@ -231,6 +246,13 @@ export class ReachVoyageDirector {
   private sagittarius: ReachSagittariusPreview | null = null;
 
   get directing(): boolean { return !!this.sagittarius || !!this.alpha || this.stage === 'departure' || this.stage === 'flyby'; }
+  startDeveloperDeparture(): void {
+    if ((this.route.id !== 'preview:pluto-to-sgra' && this.route.id !== 'preview:destination-jump')
+      || this.stop !== 0 || this.stage !== 'observe')
+      throw new Error('Developer departure is unavailable for this route');
+    this.observeLeft = 0;
+    this.update(0, false);
+  }
   get observation(): { stop: ReachStop; elapsed: number; remaining: number; departing: boolean } | null {
     if (this.sagittarius) return { stop: this.stops[0],
       elapsed: Math.min(this.sagittarius.elapsed, 20), remaining: 20, departing: false };

@@ -51,12 +51,16 @@ export function reachTravelKind(destination: ReachTimingDestination): ReachTrave
 export class ReachTiming {
   readonly config: ReachTimingConfig;
 
-  constructor(readonly mode: ReachTimingMode = 'production', private readonly random: () => number = Math.random) {
+  constructor(readonly mode: ReachTimingMode = 'production', private readonly random: () => number = Math.random,
+    private readonly developerTravelSeconds?: number) {
+    if (developerTravelSeconds !== undefined && (mode !== 'preview'
+      || !Number.isInteger(developerTravelSeconds) || developerTravelSeconds < 2
+      || developerTravelSeconds > 120)) throw new Error('Invalid developer cruise duration');
     this.config = REACH_TIMING[mode];
   }
 
   travel(destination: ReachTimingDestination): number {
-    return this.pick(this.config.travel[reachTravelKind(destination)]);
+    return this.developerTravelSeconds ?? this.pick(this.config.travel[reachTravelKind(destination)]);
   }
 
   observe(destination: ReachTimingDestination): number {
