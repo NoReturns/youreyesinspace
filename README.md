@@ -16,7 +16,7 @@ and a cumulative odometer. On multiple displays, the primary view leads the
 voyage and secondary views follow adjoining panorama slices. The host owns
 Windows installation, Settings, Reset Trip, and the isolated preview.
 
-For the v1.1.0 Windows candidate, build this branch with `REACH_PACKAGE=1` and
+For the v1.2.0 Windows release, build this branch with `REACH_PACKAGE=1` and
 a fixed `BUILD_ID`, then follow the host repository's
 [source build guide](https://github.com/NoReturns/TheReachScreensaver/blob/main/BUILD_FROM_SOURCE.md)
 for the complete offline package and required notices. This repository's npm
