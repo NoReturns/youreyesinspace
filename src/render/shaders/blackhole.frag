@@ -1,8 +1,8 @@
 // Screen-space gravitational lensing + accretion disk for one Schwarzschild black hole.
 // Units: Schwarzschild radius r_s = 1. Camera space: +x right, +y up, −z forward.
 uniform sampler2D tDiffuse;
-uniform float uTanHalfFov;
-uniform float uAspect;
+uniform mat4 uProjection;
+uniform mat4 uProjectionInverse;
 uniform vec3 uBHPos;        // camera-space position of the black hole (r_s)
 uniform vec3 uDiskNormal;   // camera-space disk axis (unit)
 uniform float uDiskInner;   // r_s
@@ -19,15 +19,15 @@ varying vec2 vUv;
 const float PI = 3.14159265359;
 
 vec3 rayDir(vec2 uv) {
-  vec2 n = uv * 2.0 - 1.0;
-  return normalize(vec3(n.x * uTanHalfFov * uAspect, n.y * uTanHalfFov, -1.0));
+  vec4 nearPoint = uProjectionInverse * vec4(uv * 2.0 - 1.0, -1.0, 1.0);
+  return normalize(nearPoint.xyz / nearPoint.w);
 }
 
 // background colour in a camera-space direction (black outside the frustum)
 vec3 background(vec3 v) {
   if (v.z >= -1e-4) return vec3(0.0);
-  vec2 s = vec2(v.x / (-v.z) / (uTanHalfFov * uAspect), v.y / (-v.z) / uTanHalfFov);
-  vec2 uv = s * 0.5 + 0.5;
+  vec4 clip = uProjection * vec4(v, 0.0);
+  vec2 uv = clip.xy / clip.w * 0.5 + 0.5;
   if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return vec3(0.0);
   return texture2D(tDiffuse, uv).rgb;
 }

@@ -1,4 +1,4 @@
-import { Quaternion, Vector3 } from 'three';
+import { Matrix4, Quaternion, Vector3, type PerspectiveCamera } from 'three';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import type { CelestialBody } from '../core/CelestialBody';
 import { Shaders } from './shaders';
@@ -15,8 +15,8 @@ export class BlackHolePass extends ShaderPass {
     super({
       uniforms: {
         tDiffuse: { value: null },
-        uTanHalfFov: { value: 0.5 },
-        uAspect: { value: 1 },
+        uProjection: { value: new Matrix4() },
+        uProjectionInverse: { value: new Matrix4() },
         uBHPos: { value: new Vector3(0, 0, -100) },
         uDiskNormal: { value: new Vector3(0, 1, 0) },
         uDiskInner: { value: 3 },
@@ -42,7 +42,7 @@ export class BlackHolePass extends ShaderPass {
    * Point the pass at a black hole. `relPos` is the hole's camera-relative position (km).
    * Returns false (and disables the pass) when lensing would be sub-pixel.
    */
-  target(body: CelestialBody, relPos: Vector3, camQuat: Quaternion, fovRad: number, aspect: number, viewportH: number, time: number): boolean {
+  target(body: CelestialBody, relPos: Vector3, camQuat: Quaternion, camera: PerspectiveCamera, fovRad: number, viewportH: number, time: number): boolean {
     const a = body.data.appearance;
     if (a.kind !== 'blackhole') { this.enabled = false; return false; }
     const rs = body.radius;
@@ -59,8 +59,8 @@ export class BlackHolePass extends ShaderPass {
     u.uDiskOuter.value = a.disk.outer;
     u.uDiskTemp.value = a.disk.temperature;
     u.uDiskBright.value = a.disk.brightness;
-    u.uTanHalfFov.value = Math.tan(fovRad / 2);
-    u.uAspect.value = aspect;
+    (u.uProjection.value as Matrix4).copy(camera.projectionMatrix);
+    (u.uProjectionInverse.value as Matrix4).copy(camera.projectionMatrixInverse);
     u.uTime.value = ((time % 500) + 500) % 500; // hours, wrapped: large arguments would break sin/cos precision in the shader
     u.uSeed.value = a.seed;
     // ray-traced region: everything the disk and the strong-field shadow could touch

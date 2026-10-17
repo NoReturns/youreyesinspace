@@ -137,15 +137,34 @@ export function reachDestinationTestRoute(fromIndex: number, toIndex: number): R
     stops: [from, REACH_ITINERARY[toIndex]] };
 }
 
+const SAGITTARIUS_TEST_STOP: Stop = { id: 'sgra', profile: 'star', label: 'Sagittarius A*',
+  ref: { kind: 'body', systemId: 'b0', bodyId: 'sgra' } };
+
+/** Ordered developer queue; the first stop is only the camera's departure source. */
+export function reachDestinationQueueRoute(fromIndex: number, queue: readonly string[]): ReachRoute {
+  const from = REACH_ITINERARY[fromIndex];
+  if (!from || destinationRef(from).kind === 'landmark')
+    throw new Error(`Queue source ${fromIndex} is unavailable as a departure body`);
+  if (queue.length === 0) throw new Error('Destination queue is empty');
+  const stops = queue.map((token, index) => {
+    if (token === 'sgra') return SAGITTARIUS_TEST_STOP;
+    const stop = /^(0|[1-9]\d*)$/.test(token) ? REACH_ITINERARY[Number(token)] : undefined;
+    if (!stop) throw new Error(`Queue destination ${index + 1} (${token}) is unavailable`);
+    return stop;
+  });
+  for (const [index, stop] of stops.entries()) {
+    if (stop.id === (stops[index - 1] ?? from).id)
+      throw new Error(`Queue destination ${index + 1} (${stop.label ?? stop.id}) repeats the previous stop`);
+  }
+  return { id: 'preview:destination-queue', version: 1, repeat: false, stops: [from, ...stops] };
+}
+
 /** Development-only routes are isolated from the production itinerary. */
 export function reachPreviewRoute(id: string): ReachRoute | null {
   if (id === 'pluto-to-sgra') return { id: 'preview:pluto-to-sgra', version: 1, repeat: false,
-    stops: [REACH_ITINERARY.find((stop) => stop.id === 'pluto')!,
-      { id: 'sgra', profile: 'star', label: 'Sagittarius A*',
-        ref: { kind: 'body', systemId: 'b0', bodyId: 'sgra' } }] };
+    stops: [REACH_ITINERARY.find((stop) => stop.id === 'pluto')!, SAGITTARIUS_TEST_STOP] };
   if (id === 'sgra') return { id: 'preview:sgra', version: 1, repeat: false,
-    stops: [{ id: 'sgra', profile: 'star', label: 'Sagittarius A*',
-      ref: { kind: 'body', systemId: 'b0', bodyId: 'sgra' } }] };
+    stops: [SAGITTARIUS_TEST_STOP] };
   if (id === 'woh-tarantula') return { id: 'preview:woh-tarantula', version: 1, repeat: true,
     stops: [REACH_ITINERARY[REACH_ITINERARY.length - 1],
       { id: 'l-30dor', profile: 'landmark', label: 'Tarantula Nebula (30 Doradus)',
@@ -247,7 +266,8 @@ export class ReachVoyageDirector {
 
   get directing(): boolean { return !!this.sagittarius || !!this.alpha || this.stage === 'departure' || this.stage === 'flyby'; }
   startDeveloperDeparture(): void {
-    if ((this.route.id !== 'preview:pluto-to-sgra' && this.route.id !== 'preview:destination-jump')
+    if ((this.route.id !== 'preview:pluto-to-sgra' && this.route.id !== 'preview:destination-jump'
+      && this.route.id !== 'preview:destination-queue')
       || this.stop !== 0 || this.stage !== 'observe')
       throw new Error('Developer departure is unavailable for this route');
     this.observeLeft = 0;
@@ -279,6 +299,22 @@ export class ReachVoyageDirector {
   get terminalObservation(): boolean {
     if (this.alpha) return this.alpha.terminal;
     return !this.route.repeat && this.stop === this.stops.length - 1 && this.stage === 'observe';
+  }
+  get queueStatus(): { index: number; count: number; complete: boolean } | null {
+    if (this.route.id !== 'preview:destination-queue') return null;
+    const count = this.stops.length - 1;
+    const index = this.departure?.next ?? this.stop;
+    const final = this.stop === count;
+    const complete = final && (this.alpha?.terminal
+      || this.stage === 'flyby' && !!this.flyby && this.flyby.elapsed >= this.flyby.duration
+      || this.stage === 'observe' && this.observeLeft <= 0);
+    return { index, count, complete: !!complete };
+  }
+  queueFailure(error: unknown): string {
+    const index = (this.departure?.next ?? this.stop) || 1;
+    const stop = this.stops[index];
+    const reason = error instanceof Error ? error.message : String(error);
+    return `Queue destination ${index}/${this.stops.length - 1} (${stop?.label ?? stop?.id ?? 'unknown'}) failed: ${reason}`;
   }
   get distanceTravelledKm(): number {
     const flight = this.stage === 'cruise' ? this.camera.autopilot : null;
@@ -321,9 +357,14 @@ export class ReachVoyageDirector {
   ) {
     this.stops = route.stops;
     this.cycleItineraryVersion = route.version;
-    for (const stop of this.stops) {
-      if (destinationRef(stop).kind === 'landmark') this.point(stop);
-      else this.destination(stop);
+    for (const [index, stop] of this.stops.entries()) {
+      try {
+        if (destinationRef(stop).kind === 'landmark') this.point(stop);
+        else this.destination(stop);
+      } catch (error) {
+        if (route.id !== 'preview:destination-queue') throw error;
+        throw new Error(`Queue destination ${index}/${this.stops.length - 1} (${stop.label ?? stop.id}) failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
     if (saved) { this.restore(saved); return; }
     const initial = this.stops[0];
@@ -480,7 +521,8 @@ export class ReachVoyageDirector {
         }
         this.onPhaseChange?.();
       }
-      if (this.alpha.terminal && this.route.repeat) {
+      if (this.alpha.terminal && (this.route.repeat
+        || this.route.id === 'preview:destination-queue' && this.stop < this.stops.length - 1)) {
         this.alpha = null;
         this.beginDeparture(0, 0);
       }
@@ -578,8 +620,10 @@ export class ReachVoyageDirector {
     this.camera.quaternion.copy(f.orientation).premultiply(orbit);
     if (f.elapsed < f.duration) return;
     const radialSpeed = f.offset.length() * 0.45 / f.duration;
-    this.flyby = null;
-    this.beginDeparture(radialSpeed, MOON_FLYBY_RATE);
+    if (this.route.repeat || this.stop < this.stops.length - 1) {
+      this.flyby = null;
+      this.beginDeparture(radialSpeed, MOON_FLYBY_RATE);
+    }
   }
 
   private beginDeparture(radialSpeed: number, orbitRate: number): void {
@@ -587,7 +631,8 @@ export class ReachVoyageDirector {
     const source = this.point(this.stops[this.stop])
       ? this.pointSource(this.stops[this.stop]) : this.destination(this.stops[this.stop]);
     const nextId = this.nextDestinationId();
-    const next = this.stops.findIndex((stop) => stop.id === nextId);
+    const next = this.route.id === 'preview:destination-queue'
+      ? this.stop + 1 : this.stops.findIndex((stop) => stop.id === nextId);
     if (next < 0) throw new Error(`Reach route no longer resolves ${nextId}`);
     this.leg = this.makeLeg(this.stops[this.stop].id, this.stops[next].id);
     const offset = new Vector3().subVectors(this.camera.position, source.position);

@@ -24,7 +24,7 @@ import type { NamedStarScreen } from './render/StarPoints';
 import { Input } from './input/Input';
 import { CameraController } from './camera/CameraController';
 import { ReachVoyageDirector, REACH_ALPHA_DESTINATION_ID, REACH_PRODUCTION_ROUTE,
-  reachDestinationTestRoute, reachPreviewRoute } from './reach/ReachVoyageDirector';
+  reachDestinationQueueRoute, reachDestinationTestRoute, reachPreviewRoute } from './reach/ReachVoyageDirector';
 import { destinationRef, destinationSystem, reachPilotStarAppearance, reachStarVisualDrift, REACH_PROXIMA_PILOT } from './reach/ReachDestinations';
 import { ReachCountdownOverlay, readCountdownContract } from './reach/ReachCountdownOverlay';
 import { ReachScaleComparison, scalePreviewEnabled } from './reach/ReachScaleComparison';
@@ -61,7 +61,8 @@ const REACH_MODE = reachParams.get('reach') === '1';
 const reachTestPreview = reachParams.get('reachPreview');
 const REACH_DESTINATION_TEST = REACH_MODE
   && (import.meta.env.DEV || import.meta.env.VITE_REACH_DEV_TEST === '1')
-  && (reachTestPreview === 'pluto-to-sgra' || reachTestPreview === 'destination-jump')
+  && (reachTestPreview === 'pluto-to-sgra' || reachTestPreview === 'destination-jump'
+    || reachTestPreview === 'destination-queue')
   && reachParams.get('reachTestStart') === 'departure';
 if (REACH_MODE && reachParams.has('reachTestStart')
   && !REACH_DESTINATION_TEST) throw new Error('This bundle does not enable the requested destination test');
@@ -69,7 +70,7 @@ const reachTestNumber = (name: string): number => {
   const raw = reachParams.get(name);
   return raw !== null && /^\d+$/.test(raw) ? Number(raw) : NaN;
 };
-const REACH_TEST_CRUISE_SECONDS = reachTestPreview === 'destination-jump'
+const REACH_TEST_CRUISE_SECONDS = reachTestPreview === 'destination-jump' || reachTestPreview === 'destination-queue'
   ? reachTestNumber('reachTestCruise') : 8;
 if (REACH_DESTINATION_TEST && (!Number.isInteger(REACH_TEST_CRUISE_SECONDS)
   || REACH_TEST_CRUISE_SECONDS < 2 || REACH_TEST_CRUISE_SECONDS > 120))
@@ -90,6 +91,9 @@ if (REACH_INSPECT_ID && !REACH_INSPECT_FIXTURES.has(REACH_INSPECT_ID))
   throw new Error(`Unknown Reach inspection checkpoint: ${REACH_INSPECT_ID}`);
 const REACH_PREVIEW_ROUTE = REACH_DESTINATION_TEST && reachTestPreview === 'destination-jump'
   ? reachDestinationTestRoute(reachTestNumber('reachTestFrom'), reachTestNumber('reachTestTo'))
+  : REACH_DESTINATION_TEST && reachTestPreview === 'destination-queue'
+    ? reachDestinationQueueRoute(reachTestNumber('reachTestFrom'),
+      reachParams.has('reachTestQueue') ? reachParams.get('reachTestQueue')!.split(',') : [])
   : REACH_PREVIEW_ID ? reachPreviewRoute(REACH_PREVIEW_ID) : null;
 if (REACH_PREVIEW_ID && !REACH_PREVIEW_ROUTE)
   throw new Error(REACH_DESTINATION_TEST ? 'Invalid or unsupported destination test route'
@@ -147,6 +151,7 @@ class App implements UIHost {
   private readonly reachCountdown: ReachCountdownOverlay | null;
   private readonly reachOdometer: ReachOdometerOverlay | null;
   private reachTestStatus: HTMLDivElement | null = null;
+  private reachQueueError: string | null = null;
   private lastReachTestStatus = 0;
   private readonly reachScale: ReachScaleComparison | null;
   private alphaMarkers: HTMLDivElement[] = [];
@@ -1411,6 +1416,13 @@ class App implements UIHost {
   }
 
   /* ---------------- Frame ---------------- */
+  private reportReachQueueError(error: unknown): void {
+    if (!this.reach?.queueStatus) throw error;
+    this.reachQueueError = this.reach.queueFailure(error);
+    console.error(this.reachQueueError, error);
+    if (this.reachTestStatus) this.reachTestStatus.textContent = this.reachQueueError;
+  }
+
   private frame = (now: number): void => {
     if (!REACH_FLICKER) requestAnimationFrame(this.frame);
     const frameStarted = this.arrivalTrace ? performance.now() : 0;
@@ -1460,10 +1472,16 @@ class App implements UIHost {
     } else if (this.surfacePreview) {
       this.surfacePreview.update(dt, this.time.paused);
     } else if (this.reach?.directing) {
-      this.reach.update(dt, this.time.paused);
+      if (!this.reachQueueError) {
+        try { this.reach.update(dt, this.time.paused); }
+        catch (error) { this.reportReachQueueError(error); }
+      }
     } else {
       this.camera.update(this.reach && this.time.paused ? 0 : dt, this.input, eng.width, eng.height, fovRad);
-      this.reach?.update(dt, this.time.paused);
+      if (!this.reachQueueError) {
+        try { this.reach?.update(dt, this.time.paused); }
+        catch (error) { this.reportReachQueueError(error); }
+      }
     }
     const cameraMs = cameraStarted ? performance.now() - cameraStarted : 0;
     if (this.reach || shared) {
@@ -1505,7 +1523,10 @@ class App implements UIHost {
       const destination = state.odometer?.leg?.toId ?? state.destinationId;
       const label = REACH_ROUTE.stops.find((stop) => stop.id === destination)?.label ?? destination;
       const source = REACH_ROUTE.stops[0].label ?? REACH_ROUTE.stops[0].id;
-      this.reachTestStatus.textContent = `TEST ${source} to ${label} | ${state.direction} | ${state.phase.kind}`;
+      const queue = this.reach.queueStatus;
+      this.reachTestStatus.textContent = this.reachQueueError ?? (queue
+        ? `QUEUE ${queue.index}/${queue.count} ${label} | ${queue.complete ? 'COMPLETE' : state.phase.kind}`
+        : `TEST ${source} to ${label} | ${state.direction} | ${state.phase.kind}`);
     }
     this.aimAtPin(dt, fovRad, eng.width / Math.max(1, eng.height));
     // backdrop bookkeeping: start circling once the return flight has arrived; any other flight
@@ -1805,7 +1826,7 @@ class App implements UIHost {
       if (score > bestScore) { bestScore = score; best = v; }
     }
     if (!best) { eng.blackHole.enabled = false; return; }
-    eng.blackHole.target(best.body, best.relPos, this.camera.quaternion, fovRad, eng.camera.aspect, eng.height, this.time.t / 3600);
+    eng.blackHole.target(best.body, best.relPos, this.camera.quaternion, eng.camera, fovRad, eng.height, this.time.t / 3600);
   }
 
   /** Sky markers for black holes that live in other systems (the current one is a body). */
