@@ -89,7 +89,7 @@ export const SPACECRAFT: BodyData[] = [
     id: 'iss', name: 'ISS', type: 'spacecraft', parent: 'earth',
     radius: 0.055, mass: 419_725, albedo: 0.6,
     orbit: orbit(6_789, 0.0006, 51.64, 0.0645, 40, 120, 30),
-    appearance: { kind: 'spacecraft', model: M('iss'), seed: 907 },
+    appearance: { kind: 'spacecraft', model: '/models/iss-vtad-uastc-joined.glb', seed: 907 },
     description: 'Uluslararası Uzay İstasyonu: alçak Dünya yörüngesindeki modüler araştırma istasyonu; 2000\'den beri kesintisiz mürettebatlı. 109 m genişliğinde, günde ~16 kez Dünya\'yı dolaşır.',
     facts: { 'İlk modül': '20 Kasım 1998 (Zarya)', 'Ortaklar': 'NASA, Roskosmos, ESA, JAXA, CSA', 'Durum': 'Aktif – mürettebatlı', 'Yörünge hızı': '7,66 km/s' },
   },

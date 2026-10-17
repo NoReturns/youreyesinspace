@@ -7,7 +7,7 @@ import type { StarSystem } from './core/StarSystem';
 import { CelestialBody } from './core/CelestialBody';
 import { StarCatalog } from './data/StarCatalog';
 import { LightPulse } from './render/TourEffects';
-import { BodyRenderer, type BodyView } from './render/BodyRenderer';
+import { BodyRenderer, initializeSpacecraftModelLoader, type BodyView } from './render/BodyRenderer';
 import { BodyPoints } from './render/BodyPoints';
 import { OrbitLines } from './render/OrbitLines';
 import { StarPoints } from './render/StarPoints';
@@ -224,6 +224,7 @@ class App implements UIHost {
       sceneCanvas.addEventListener('webglcontextrestored', () => this.arrivalTrace!.event('webgl-context-restored'));
     }
     this.engine = new Engine(sceneCanvas);
+    initializeSpacecraftModelLoader(this.engine.renderer, REACH_MODE);
     if (this.panorama) this.engine.setPanorama(this.panorama);
     const scene = this.engine.scene;
     const gl = this.engine.renderer.getContext();

@@ -1,10 +1,11 @@
 import {
   AdditiveBlending, AmbientLight, BackSide, Box3, CircleGeometry, Color, CylinderGeometry, DirectionalLight, DoubleSide, FrontSide, Group, Mesh,
   MeshStandardMaterial, NormalBlending, PlaneGeometry, RepeatWrapping, RingGeometry, Scene, ShaderMaterial, Sphere, SphereGeometry,
-  SRGBColorSpace, TextureLoader, Vector3, Vector4, type Camera, type IUniform, type Quaternion, type Texture,
+  SRGBColorSpace, TextureLoader, Vector3, Vector4, type Camera, type IUniform, type Quaternion, type Texture, type WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import type { CelestialBody } from '../core/CelestialBody';
 import type { StarSystem } from '../core/StarSystem';
 import { DEG, PARSEC_KM } from '../core/constants';
@@ -72,20 +73,39 @@ function ringGapUniforms(body: CelestialBody): Vector4[] {
 }
 
 /** Renders one celestial body: surface, clouds, atmosphere, rings, corona. */
-// NASA 3D Resources GLBs are Draco-compressed; three r186 resolves the decoder (wasm) through
-// the bundler, so it ships as a hashed asset alongside the app.
+// Legacy NASA GLBs use Draco; the ISS VTAD model uses KTX2 textures. Both decoders ship offline.
 const gltfLoader = new GLTFLoader().setDRACOLoader(new DRACOLoader());
 /** Loaded glTF scenes by URL (shared between views, cloned per body) */
 const modelCache = new Map<string, Promise<Group>>();
 const textureLoader = new TextureLoader();
+const ISS_MODEL = '/models/iss-vtad-uastc-joined.glb';
+const ISS_FALLBACK_MODEL = '/models/iss.glb';
+
+/** Configure KTX2 for this WebView before any glTF request. */
+export function initializeSpacecraftModelLoader(renderer: WebGLRenderer, preloadIss: boolean): void {
+  const transcoderPath = import.meta.env.DEV ? '/node_modules/three/examples/jsm/libs/basis/' : '/basis/';
+  gltfLoader.setKTX2Loader(new KTX2Loader().setTranscoderPath(transcoderPath).detectSupport(renderer));
+  if (preloadIss) {
+    // Reach visits ISS early; warm the shared cache before approach on each display.
+    void loadModel(ISS_MODEL).catch((error) => console.error('ISS model and fallback failed to load', error));
+  }
+}
 
 function loadModel(url: string): Promise<Group> {
   let p = modelCache.get(url);
   if (!p) {
-    p = new Promise<Group>((resolve, reject) => {
+    const fetchModel = (path: string) => new Promise<Group>((resolve, reject) => {
       // /models/* is served with an immutable cache; the build id busts it on redeploy
-      gltfLoader.load(`${url}?v=${__BUILD_ID__}`, (gltf) => resolve(gltf.scene), undefined, (err) => reject(err));
+      gltfLoader.load(`${path}?v=${__BUILD_ID__}`, (gltf) => resolve(gltf.scene), undefined, (err) => reject(err));
     });
+    if (url === ISS_MODEL) {
+      p = fetchModel(ISS_MODEL).catch((error) => {
+        console.warn('ISS VTAD load failed; using existing ISS model', error);
+        return fetchModel(ISS_FALLBACK_MODEL);
+      });
+    } else {
+      p = fetchModel(url);
+    }
     modelCache.set(url, p);
   }
   return p;

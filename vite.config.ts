@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
@@ -11,7 +11,19 @@ const reachPackage = process.env.REACH_PACKAGE === '1';
 let reachOutputDir = resolve('dist');
 
 export default defineConfig({
-  plugins: reachPackage ? [{
+  plugins: [{
+    name: 'offline-basis-transcoder',
+    configResolved(config) {
+      reachOutputDir = resolve(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      const basisDir = resolve(reachOutputDir, 'basis');
+      mkdirSync(basisDir, { recursive: true });
+      for (const name of ['basis_transcoder.js', 'basis_transcoder.wasm']) {
+        copyFileSync(resolve('node_modules/three/examples/jsm/libs/basis', name), resolve(basisDir, name));
+      }
+    },
+  }, ...(reachPackage ? [{
     name: 'reach-package-brand-cleanup',
     configResolved(config) {
       reachOutputDir = resolve(config.root, config.build.outDir);
@@ -42,7 +54,7 @@ export default defineConfig({
         rmSync(resolve(reachOutputDir, 'models', name), { force: true });
       }
     },
-  }] : [],
+  }] : [])],
   server: {
     port: 5173,
     open: false,

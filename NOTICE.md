@@ -20,9 +20,17 @@ catalogue objects.
 
 ## 3D models
 
-`public/models/*.glb` (Voyager, Pioneer, Parker Solar Probe, Hubble, ISS, JWST, Perseverance,
-Juno, Dawn, Galileo) come from [NASA 3D Resources](https://science.nasa.gov/3d-resources/) and
-are Draco-compressed copies. The mission planner's fictional ships (Star Trek, Star Wars,
+The legacy `public/models/*.glb` spacecraft (Voyager, Pioneer, Parker Solar Probe, Hubble, JWST,
+Perseverance, Juno, Dawn, Galileo, and the retained `iss.glb` fallback) come from
+[NASA 3D Resources](https://science.nasa.gov/3d-resources/) and are Draco-compressed copies.
+The production ISS asset, `public/models/iss-vtad-uastc-joined.glb`, is an optimized derivative
+of the [NASA VTAD International Space Station 3D Model](https://science.nasa.gov/resource/international-space-station-3d-model/)
+([original GLB](https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/i/ISS_stationary.glb)).
+It retains NASA geometry and surface imagery, with UASTC/KTX2 compressed textures and joined
+meshes. The accepted production file is 26,574,636 bytes, SHA-256
+`445b11b724b449f974cc4d2c05f50ecdf0120df312ef0751d91df679c4d68b32`.
+The original downloads and optimization records remain in `Preview/Spacecraft-Model-Pilot/` and
+are not production assets. The mission planner's fictional ships (Star Trek, Star Wars,
 The Expanse) use original, schematic primitive-built models (`src/render/ProceduralShips.ts`);
 no third-party model or artwork is bundled. NASA material is generally not copyrighted, but the
 [NASA media usage guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/) apply:
@@ -48,6 +56,7 @@ Loaded at runtime directly from NASA servers; see `src/data/imagery.ts`.
 ## Software dependencies
 
 * [three.js](https://threejs.org/) — MIT
+* [Basis Universal transcoder](https://github.com/BinomialLLC/basis_universal) (bundled for offline KTX2 textures) - Apache-2.0
 * [Vite](https://vite.dev/), [TypeScript](https://www.typescriptlang.org/) — MIT / Apache-2.0 (build-time only)
 * Node.js — MIT (build-time only)
 
